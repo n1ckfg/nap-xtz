@@ -152,6 +152,14 @@ async function mintCurrentNaplps() {
         console.warn("[nap-xtz] no pendingNapRaw");
         return;
     }
+
+    // Tezos operations have a ~32KB hard limit. If napRaw is too large, it will time out or fail.
+    if (napRaw.length > 30000) {
+        setStatus(`NAPLPS too large (${(napRaw.length / 1024).toFixed(1)} KB). Max 30 KB. Try a simpler SVG.`, true);
+        console.warn("[nap-xtz] napRaw too large:", napRaw.length);
+        return;
+    }
+
     if (CONTRACT_ADDRESS === "KT1PLACEHOLDER") {
         setStatus("Contract not deployed — set CONTRACT_ADDRESS in tezos.js", true);
         return;

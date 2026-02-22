@@ -1324,7 +1324,7 @@ class NapEncoder {
 		// and lets you trade precision for file size. The most common value
 		// found in the wild is 4, followed by 3.
 		if (_dataLength === undefined) {
-			this.dataLength = 4;
+			this.dataLength = 3;
 		} else {
 			this.dataLength = _dataLength;
 		}

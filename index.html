@@ -271,6 +271,8 @@
 			    		}
 			    	}
 					
+					points = rdpSimplify(points, 0.02);
+
 					const stroke = new NapInputWrapper(color, points, isFill);
 					input.push(stroke);
 			    }
@@ -303,6 +305,8 @@
 						}
 			    	}
 					
+					points = rdpSimplify(points, 0.02);
+
 					const stroke = new NapInputWrapper(color, points, isFill);
 					input.push(stroke);
 			    }
@@ -349,7 +353,7 @@
 			    		//}
 			    	}
 
-			    	points = rdpSimplify(points, 0.01); // default 0.005, higher = more simplification
+			    	points = rdpSimplify(points, 0.02); // default 0.005, higher = more simplification
 
 			    	if (points.length > 0) {
 			    		const stroke = new NapInputWrapper(color, points, isFill);
