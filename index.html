@@ -37,7 +37,7 @@
 			function preload() {
 			    isMobile = detectMobile();
 
-			    if (isMobile) loadNewTelidon("./images/shark.nap");
+			    if (isMobile) loadNewTelidon("./images/output_20260222_181549.nap");
 			}
 
 			function setup() {
@@ -50,55 +50,57 @@
 			    dropZone.addEventListener('dragover', onDragOver);
 			    dropZone.addEventListener('drop', onDrop);
 			    
-			    defaultFont = loadFont("./archives/fonts/Telidon-Bold/Telidon-Bold.ttf", function(font) {
+			    defaultFont = loadFont("./files/fonts/Telidon-Bold/Telidon-Bold.ttf", function(font) {
 			        textFont(font);
 			        textSize(36);
 			        textAlign(LEFT);        
 			    });
 
-			    preview = document.getElementById("preview");
-			    setPreview("shark");
+			    //preview = document.getElementById("preview");
+			    //setPreview("shark");
 			    
+			    /*
 			    explanation = document.getElementById("explanation");
 			    explanationbg = document.getElementById("explanation-bg");
 			    explanation.addEventListener("click", function() {
 			        explanation.style = "opacity: 0";
 			        explanationbg.style = "opacity: 0";
 			    });
+			    */
 
-			    shark = document.getElementById("shark").addEventListener("click", function() {
-			        loadNewTelidon("./images/shark.nap");
-			        setPreview("shark");
+			    shark = document.getElementById("one").addEventListener("click", function() {
+			        loadNewTelidon("./images/output_20260222_181549.nap");
+			        //setPreview("shark");
 			    });
 
-			    skull = document.getElementById("skull").addEventListener("click", function() {
-			        loadNewTelidon("./images/wast.nap");
-			        setPreview("skull");
+			    skull = document.getElementById("two").addEventListener("click", function() {
+			        loadNewTelidon("./images/output_20260222_181957.nap");
+			        //setPreview("skull");
 			    });
 
-			    santa = document.getElementById("santa").addEventListener("click", function() {
-			        loadNewTelidon("./images/santa.nap");
-			        setPreview("santa");
+			    santa = document.getElementById("three").addEventListener("click", function() {
+			        loadNewTelidon("./images/output_20260222_181140.nap");
+			        //setPreview("santa");
 			    });
 
-			    beer = document.getElementById("beer").addEventListener("click", function() {
-			        loadNewTelidon("./images/beer.nap");
-			        setPreview("beer");
+			    beer = document.getElementById("four").addEventListener("click", function() {
+			        loadNewTelidon("./images/output_20260222_182028.nap");
+			        //setPreview("beer");
 			    });
 
-			    haunt = document.getElementById("haunt").addEventListener("click", function() {
-			        loadNewTelidon("./images/haunt.nap");
-			        setPreview("haunt");
+			    haunt = document.getElementById("five").addEventListener("click", function() {
+			        loadNewTelidon("./images/output_20260222_181804.nap");
+			        //setPreview("haunt");
 			    });
 
-			    email = document.getElementById("email").addEventListener("click", function() {
-			        loadNewTelidon("./images/email2.nap");
-			        setPreview("email");
+			    email = document.getElementById("six").addEventListener("click", function() {
+			        loadNewTelidon("./images/output_20260222_181558.nap");
+			        //setPreview("email");
 			    });
 
-			    mouse = document.getElementById("mouse").addEventListener("click", function() {
-			        loadNewTelidon("./images/tb1.nap");
-			        setPreview("mouse");
+			    mouse = document.getElementById("seven").addEventListener("click", function() {
+			        loadNewTelidon("./images/output_20260222_181503.nap");
+			        //setPreview("mouse");
 			    });
 			}
 
@@ -181,9 +183,9 @@
 			    });
 			}
 
-			function setPreview(name) {
-			    preview.style.backgroundImage = "url(./tools/rosetta_stone/cover/png/" + name + ".png)";
-			}
+			//function setPreview(name) {
+			//    preview.style.backgroundImage = "url(./tools/rosetta_stone/cover/png/" + name + ".png)";
+			//}
 
 			function setupGif() {
 			    gif = new GIF({
@@ -416,16 +418,16 @@
 		<div id="container">
 			<div class="sketch">
 				&nbsp;&nbsp;<a href="https://github.com/n1ckfg/Telidon"><i>source</i></a>&nbsp;&nbsp;|&nbsp;&nbsp;
-				<a href="javascript:void(0)" id="shark">shark</a>&nbsp;&nbsp;|&nbsp;&nbsp;
-				<a href="javascript:void(0)" id="skull">skull</a>&nbsp;&nbsp;|&nbsp;&nbsp;
-				<a href="javascript:void(0)" id="santa">santa</a>&nbsp;&nbsp;|&nbsp;&nbsp;
-				<a href="javascript:void(0)" id="beer">beer</a>&nbsp;&nbsp;|&nbsp;&nbsp;
-				<a href="javascript:void(0)" id="haunt">haunt</a>&nbsp;&nbsp;|&nbsp;&nbsp;
-				<a href="javascript:void(0)" id="email">email</a>&nbsp;&nbsp;|&nbsp;&nbsp;
-				<a href="javascript:void(0)" id="mouse">mouse</a><br>
+				<a href="javascript:void(0)" id="one">one</a>&nbsp;&nbsp;|&nbsp;&nbsp;
+				<a href="javascript:void(0)" id="two">two</a>&nbsp;&nbsp;|&nbsp;&nbsp;
+				<a href="javascript:void(0)" id="three">three</a>&nbsp;&nbsp;|&nbsp;&nbsp;
+				<a href="javascript:void(0)" id="four">four</a>&nbsp;&nbsp;|&nbsp;&nbsp;
+				<a href="javascript:void(0)" id="five">five</a>&nbsp;&nbsp;|&nbsp;&nbsp;
+				<a href="javascript:void(0)" id="six">six</a>&nbsp;&nbsp;|&nbsp;&nbsp;
+				<a href="javascript:void(0)" id="seven">seven</a><br>
 			</div>
 
-			<div class="preview-base" id="preview"></div>
+			<!--<div class="preview-base" id="preview"></div>
 
 			<div class="preview-base" id="explanation-bg"></div>
 			<div class="explanation-base" id="explanation">
@@ -438,6 +440,7 @@
 				<p>
 					From 1982&ndash;1985, members of the Toronto arts org <a href="http://interaccess.org/">InterAccess</a> used Telidon systems to produce an ambitious series of <a href="https://motherboard.vice.com/en_us/article/ezveak/the-original-net-artists">interactive BBS-based artworks</a> in the format.
 				</p>
+				-->
 				<!--
 				<p>
 					Three anniversary events were held at InterAccess in spring 2018:<br/>
@@ -445,11 +448,11 @@
 					<a href="http://interaccess.org/event/2018/digital-archaeology-excavating-telidon">http://interaccess.org/event/2018/digital-archaeology-excavating-telidon</a><br/>
 					<a href="http://interaccess.org/exhibition/telidon">http://interaccess.org/exhibition/telidon</a>
 				</p>
-				-->
 				<p>
 					Nick Fox-Gieg&nbsp;&nbsp;/&nbsp;&nbsp;180326
 				</p>
-			</div>
+				-->
+			<!--</div>-->
 			<div id="naplps_field_container">
 				<form>
 					<label style="color: #ffffff;" for="naplps_field">NAPLPS Text: </label>

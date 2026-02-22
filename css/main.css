@@ -18,7 +18,7 @@
 	}
 
 	#container {
-		width: 1280px;
+		width: 640px;
 		height: 511px;
 		position: absolute;
 		left: 0px;
@@ -27,8 +27,8 @@
 
 	#naplps_field_container {
 		position: absolute;
-		left: 650px;
-		top: 400px;
+		left: 12px;
+		top: 520px;
 		z-index: 1;
 		width:178px;
 		height: 80px;
