@@ -144,3 +144,33 @@ a:hover {
 .explanation-base a {
 	color: #ffffff;
 }
+
+/* ── Tezos wallet / mint UI ── */
+.tezos-btn {
+	background: #001a33;
+	color: #ffffff;
+	border: 1px solid #0055aa;
+	border-radius: 0.3em;
+	padding: 0.1em 0.55em;
+	cursor: pointer;
+	font-size: 0.82em;
+	font-family: inherit;
+	vertical-align: middle;
+}
+
+.tezos-btn:hover {
+	background: #0055aa;
+}
+
+.tezos-status {
+	color: #ffcc00;
+	font-size: 0.82em;
+	vertical-align: middle;
+}
+
+.tezos-address {
+	color: #88ccff;
+	font-size: 0.82em;
+	vertical-align: middle;
+	font-family: monospace;
+}

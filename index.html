@@ -3,6 +3,15 @@
 
 	<head>
 		<title>NAPLPS x XTZ</title>
+		<!-- unsafe-eval is required by the Beacon SDK browser bundle (uses new Function() internally) -->
+		<meta http-equiv="Content-Security-Policy" content="
+			default-src 'self' data: blob:;
+			script-src  'self' 'unsafe-eval' 'unsafe-inline' https://unpkg.com blob:;
+			connect-src 'self' https: wss:;
+			img-src     'self' data: blob:;
+			worker-src  'self' blob:;
+			style-src   'self' 'unsafe-inline';
+		">
 		<link type="text/css" rel="stylesheet" href="./css/main.css"/>
 		<script type="text/javascript" src="./js/libraries/p5js/p5.min.js"></script>
 		<script type="text/javascript" src="./js/libraries/p5js/p5.dom.min.js"></script>
@@ -10,6 +19,8 @@
 		<script type="text/javascript" src="./js/libraries/gifjs/gif.js"></script>
 		<script type="text/javascript" src="./js/telidon/naplps.js"></script>
 		<script type="text/javascript" src="./js/telidon/TelidonP5.js"></script>
+		<script type="text/javascript" src="https://unpkg.com/@airgap/beacon-dapp/dist/walletbeacon.dapp.min.js"></script>
+		<script type="text/javascript" src="./js/tezos/tezos.js"></script>
 		<script type="text/javascript">
 			"use strict";
 
@@ -102,6 +113,9 @@
 			        loadNewTelidon("./images/output_20260222_181503.nap");
 			        //setPreview("mouse");
 			    });
+
+			    // Initialise Tezos wallet and load latest on-chain token.
+			    initTezos();
 			}
 
 			function draw() {    
@@ -163,7 +177,6 @@
 	            if (telidon.length >= maxLength) telidon.splice(0,1);
 	            telidon.push(new TelidonDraw([input], sW, sW));
 	            recording = true;
-	            preview.style.backgroundImage = null;
 			}
 
 			function onFormSubmit() {
@@ -363,7 +376,12 @@
 				_a.click();
 				URL.revokeObjectURL(_url);
 
-				loadTelidonFromText(encoder.napRaw);				
+				// Expose encoded NAPLPS for the Tezos mint flow.
+				window.pendingNapRaw = encoder.napRaw;
+				const btnMint = document.getElementById('btn-mint');
+				if (btnMint) btnMint.style.display = 'inline-block';
+
+				loadTelidonFromText(encoder.napRaw);
 			}
 
 		function rdpSimplify(points, epsilon) {
@@ -424,7 +442,12 @@
 				<a href="javascript:void(0)" id="four">four</a>&nbsp;&nbsp;|&nbsp;&nbsp;
 				<a href="javascript:void(0)" id="five">five</a>&nbsp;&nbsp;|&nbsp;&nbsp;
 				<a href="javascript:void(0)" id="six">six</a>&nbsp;&nbsp;|&nbsp;&nbsp;
-				<a href="javascript:void(0)" id="seven">seven</a><br>
+				<a href="javascript:void(0)" id="seven">seven</a>&nbsp;&nbsp;|&nbsp;&nbsp;
+				<button id="btn-connect"    class="tezos-btn" onclick="connectWallet()">Connect Wallet</button>
+				<button id="btn-disconnect" class="tezos-btn" onclick="disconnectWallet()" style="display:none">Disconnect</button>
+				<span id="tezos-address" class="tezos-address"></span>&nbsp;
+				<button id="btn-mint" class="tezos-btn" onclick="mintCurrentNaplps()" style="display:none">Mint to Tezos</button>&nbsp;
+				<span id="tezos-status" class="tezos-status"></span><br>
 			</div>
 
 			<!--<div class="preview-base" id="preview"></div>
