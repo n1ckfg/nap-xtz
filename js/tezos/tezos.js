@@ -96,7 +96,7 @@ async function initTezos() {
         }
 
         // Try to load the latest on-chain token and render it.
-        await loadLatestToken();
+        //await loadLatestToken();
 
     } catch (e) {
         console.error("initTezos:", e);

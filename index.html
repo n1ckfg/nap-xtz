@@ -33,7 +33,7 @@
 			let defaultFont;
 
 			let preview, explanation, explanationbg;
-			let shark, skull, santa, beer, haunt, email, mouse;
+			//let shark, skull, santa, beer, haunt, email, mouse;
 
 			let isMobile = false;
 
@@ -71,38 +71,41 @@
 			        explanationbg.style = "opacity: 0";
 			    });
 			    */
+				document.getElementById("latest").addEventListener("click", function() {
+			        loadLatestToken();
+			    });
 
-			    shark = document.getElementById("one").addEventListener("click", function() {
+			    document.getElementById("one").addEventListener("click", function() {
 			        loadNewTelidon("./images/output_20260222_181549.nap");
 			        //setPreview("shark");
 			    });
 
-			    skull = document.getElementById("two").addEventListener("click", function() {
+			    document.getElementById("two").addEventListener("click", function() {
 			        loadNewTelidon("./images/output_20260222_181957.nap");
 			        //setPreview("skull");
 			    });
 
-			    santa = document.getElementById("three").addEventListener("click", function() {
+			    document.getElementById("three").addEventListener("click", function() {
 			        loadNewTelidon("./images/output_20260222_181140.nap");
 			        //setPreview("santa");
 			    });
 
-			    beer = document.getElementById("four").addEventListener("click", function() {
+			   document.getElementById("four").addEventListener("click", function() {
 			        loadNewTelidon("./images/output_20260222_182028.nap");
 			        //setPreview("beer");
 			    });
 
-			    haunt = document.getElementById("five").addEventListener("click", function() {
+			    document.getElementById("five").addEventListener("click", function() {
 			        loadNewTelidon("./images/output_20260222_181804.nap");
 			        //setPreview("haunt");
 			    });
 
-			    email = document.getElementById("six").addEventListener("click", function() {
+			    document.getElementById("six").addEventListener("click", function() {
 			        loadNewTelidon("./images/output_20260222_181558.nap");
 			        //setPreview("email");
 			    });
 
-			    mouse = document.getElementById("seven").addEventListener("click", function() {
+			    document.getElementById("seven").addEventListener("click", function() {
 			        loadNewTelidon("./images/output_20260222_181503.nap");
 			        //setPreview("mouse");
 			    });
@@ -435,6 +438,7 @@
 		<div id="container">
 			<div class="sketch">
 				&nbsp;&nbsp;<a href="https://github.com/n1ckfg/nap-xtz"><i>source</i></a>&nbsp;&nbsp;|&nbsp;&nbsp;
+				<a href="javascript:void(0)" id="latest"><i>latest</i></a>&nbsp;&nbsp;|&nbsp;&nbsp;
 				<a href="javascript:void(0)" id="one">one</a>&nbsp;&nbsp;|&nbsp;&nbsp;
 				<a href="javascript:void(0)" id="two">two</a>&nbsp;&nbsp;|&nbsp;&nbsp;
 				<a href="javascript:void(0)" id="three">three</a>&nbsp;&nbsp;|&nbsp;&nbsp;
