@@ -23,6 +23,7 @@
 		position: absolute;
 		left: 0px;
 		top: 0px;
+		z-index: 10;
 	}
 
 	#naplps_field_container {
@@ -30,7 +31,7 @@
 		left: 12px;
 		top: 520px;
 		z-index: 1;
-		width:178px;
+		width:400px;
 		height: 80px;
 		border: 1px solid black;
 		border-radius: 0.5em;
@@ -90,6 +91,7 @@
 		position: absolute;
 		left: 0px;
 		top: 0px;
+		z-index: 10;
 	}
 
 	canvas {

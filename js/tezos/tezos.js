@@ -48,7 +48,7 @@ function updateWalletUI() {
         if (btnDisconnect) btnDisconnect.style.display = "inline-block";
         if (addrEl) {
             const addr = _activeAccount.address;
-            addrEl.textContent = addr.slice(0, 6) + "…" + addr.slice(-4);
+            addrEl.textContent = addr.slice(0, 6) + "..." + addr.slice(-4);
             addrEl.title = addr;
         }
     } else {
@@ -108,8 +108,8 @@ async function initTezos() {
 async function connectWallet() {
     if (!_beaconClient) { setStatus("SDK not ready", true); return; }
     try {
-        setStatus("Opening wallet…");
-        console.log("[nap-xtz] requestPermissions…");
+        setStatus("Opening wallet...");
+        console.log("[nap-xtz] requestPermissions...");
         // Network was set at DAppClient construction — do not pass it here.
         await _beaconClient.requestPermissions();
         _activeAccount = await _beaconClient.getActiveAccount();
@@ -168,11 +168,11 @@ async function mintCurrentNaplps() {
     }
 
     try {
-        setStatus("Sending mint transaction…");
+        setStatus("Sending mint transaction...");
         console.log("[nap-xtz] calling mintNaplpsToken, napRaw length:", napRaw.length);
         const result = await mintNaplpsToken(napRaw);
         console.log("[nap-xtz] requestOperation result:", result);
-        setStatus("Transaction sent — waiting for confirmation…");
+        setStatus("Transaction sent — waiting for confirmation...");
         // Ghostnet block time ~15 s; allow two blocks + TzKT indexing lag.
         setTimeout(async () => {
             await loadLatestToken();
@@ -226,7 +226,7 @@ async function mintNaplpsToken(napRaw) {
 async function loadLatestToken() {
     if (CONTRACT_ADDRESS === "KT1PLACEHOLDER") return;
     try {
-        setStatus("Loading latest token from chain…");
+        setStatus("Loading latest token from chain...");
         const napRaw = await readLatestNaplps();
         if (napRaw) {
             console.log("[nap-xtz] loaded from chain, NAPLPS length:", napRaw.length);

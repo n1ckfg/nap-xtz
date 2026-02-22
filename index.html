@@ -438,11 +438,6 @@
 				<a href="javascript:void(0)" id="five">five</a>&nbsp;&nbsp;|&nbsp;&nbsp;
 				<a href="javascript:void(0)" id="six">six</a>&nbsp;&nbsp;|&nbsp;&nbsp;
 				<a href="javascript:void(0)" id="seven">seven</a>&nbsp;&nbsp;|&nbsp;&nbsp;
-				<button id="btn-connect" class="tezos-btn" onclick="connectWallet()">Connect Wallet</button>
-				<button id="btn-disconnect" class="tezos-btn" onclick="disconnectWallet()" style="display:none">Disconnect</button>
-				<button id="btn-mint" class="tezos-btn" onclick="mintCurrentNaplps()" style="display:none">Mint to Tezos</button>&nbsp;
-				<span id="tezos-address" class="tezos-address"></span>&nbsp;
-				<span id="tezos-status" class="tezos-status"></span><br>
 			</div>
 
 			<!--<div class="preview-base" id="preview"></div>
@@ -472,11 +467,20 @@
 				-->
 			<!--</div>-->
 			<div id="naplps_field_container">
-				<form>
-					<label style="color: #ffffff;" for="naplps_field">NAPLPS Text: </label>
-					<input type="text" id="naplps_field" name="naplps_field"><br><br>
-  					<input type="button" onclick="onFormSubmit()" value="Submit">
-				</form> 
+				<div>
+					<form>
+						<label style="color: #ffffff;" for="naplps_field">NAPLPS Text: </label><br>
+						<input type="text" id="naplps_field" name="naplps_field"><br>
+	  					<input type="button" onclick="onFormSubmit()" value="Submit">
+					</form> 
+				</div>
+				<div style="position: relative; margin-left: 180px; margin-top: -60px;">
+					<button id="btn-connect" class="tezos-btn" onclick="connectWallet()">Connect Wallet</button>
+					<button id="btn-disconnect" class="tezos-btn" onclick="disconnectWallet()" style="display:none">Disconnect</button><br>
+					<button id="btn-mint" class="tezos-btn" onclick="mintCurrentNaplps()">Mint to Tezos</button><br>
+					<span id="tezos-address" class="tezos-address"></span>&nbsp;
+					<span id="tezos-status" class="tezos-status"></span><br>
+				</div>
 			<div>
 		</div>
 	</body>
