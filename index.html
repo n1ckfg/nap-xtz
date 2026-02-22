@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html>
+
+	<head>
+		<title>TelidonP5</title>
+		<link type="text/css" rel="stylesheet" href="./css/main.css"/>
+		<script type="text/javascript" src="./js/libraries/p5js/p5.min.js"></script>
+		<script type="text/javascript" src="./js/libraries/p5js/p5.dom.min.js"></script>
+		<script type="text/javascript" src="./js/libraries/p5js/p5.svg.js"></script>
+		<script type="text/javascript" src="./js/libraries/gifjs/gif.js"></script>
+		<script type="text/javascript" src="./js/telidon/naplps.js"></script>
+		<script type="text/javascript" src="./js/telidon/TelidonP5.js"></script>
+		<script type="text/javascript">
+			"use strict";
+
+			let recording = true;
+			let c;
+			let gif;
+			let posCounterX = 0;
+			let posCounterY = 0;
+
+			let telidon = [];
+			let maxLength = 3;
+
+			let dropZone;
+			let sW = 640;
+			let sH = 480;
+
+			let defaultFont;
+
+			let preview, explanation, explanationbg;
+			let shark, skull, santa, beer, haunt, email, mouse;
+
+			let isMobile = false;
+
+
+			function preload() {
+			    isMobile = detectMobile();
+
+			    if (isMobile) loadNewTelidon("./images/shark.nap");
+			}
+
+			function setup() {
+				c = createCanvas(sW, sH);
+				c.position(0, 29);
+
+			    if (!isMobile) setupGif();
+
+				dropZone = document.getElementsByTagName("body")[0];
+			    dropZone.addEventListener('dragover', onDragOver);
+			    dropZone.addEventListener('drop', onDrop);
+			    
+			    defaultFont = loadFont("./archives/fonts/Telidon-Bold/Telidon-Bold.ttf", function(font) {
+			        textFont(font);
+			        textSize(36);
+			        textAlign(LEFT);        
+			    });
+
+			    preview = document.getElementById("preview");
+			    setPreview("shark");
+			    
+			    explanation = document.getElementById("explanation");
+			    explanationbg = document.getElementById("explanation-bg");
+			    explanation.addEventListener("click", function() {
+			        explanation.style = "opacity: 0";
+			        explanationbg.style = "opacity: 0";
+			    });
+
+			    shark = document.getElementById("shark").addEventListener("click", function() {
+			        loadNewTelidon("./images/shark.nap");
+			        setPreview("shark");
+			    });
+
+			    skull = document.getElementById("skull").addEventListener("click", function() {
+			        loadNewTelidon("./images/wast.nap");
+			        setPreview("skull");
+			    });
+
+			    santa = document.getElementById("santa").addEventListener("click", function() {
+			        loadNewTelidon("./images/santa.nap");
+			        setPreview("santa");
+			    });
+
+			    beer = document.getElementById("beer").addEventListener("click", function() {
+			        loadNewTelidon("./images/beer.nap");
+			        setPreview("beer");
+			    });
+
+			    haunt = document.getElementById("haunt").addEventListener("click", function() {
+			        loadNewTelidon("./images/haunt.nap");
+			        setPreview("haunt");
+			    });
+
+			    email = document.getElementById("email").addEventListener("click", function() {
+			        loadNewTelidon("./images/email2.nap");
+			        setPreview("email");
+			    });
+
+			    mouse = document.getElementById("mouse").addEventListener("click", function() {
+			        loadNewTelidon("./images/tb1.nap");
+			        setPreview("mouse");
+			    });
+			}
+
+			function draw() {    
+				background(0);
+			    if (telidon.length < 1) {
+			        fill(255);
+			        textAlign(CENTER);
+			        text("\\\\ DRAG ' n ' DROP //", width/2, height/2);
+			        textAlign(LEFT);
+			        return;
+			    }
+
+			    translate(0,sH-sW);
+				
+			    for (let i=0; i<telidon.length; i++) {
+					telidon[i].draw();
+				}
+
+			    if (!isMobile && recording && frameCount % 2 == 0) {
+			        gif.addFrame(c.elt, {delay: 1, copy: true});
+			    }
+
+			    if (!isMobile && recording && telidon[telidon.length-1].finished) {
+			        recording = false;
+			        gif.render();
+			    }
+			}
+
+			// Show the copy icon when dragging over.  Seems to only work for chrome.
+			function onDragOver(e) {
+			    e.stopPropagation();
+			    e.preventDefault();
+			    e.dataTransfer.dropEffect = 'copy';    
+			}
+
+			function onDrop(e) {
+			    e.stopPropagation();
+			    e.preventDefault();
+			    let file = e.dataTransfer.files[0]; 
+		        let reader = new FileReader();
+		        reader.onload = function(e2) {
+		        	const fileNameArray = file.name.split(".");
+		        	if (fileNameArray[fileNameArray.length-1] === "svg") {
+		        		let div = document.createElement('div');
+        				let element = new p5.SVGElement(div);
+                		div.innerHTML = e2.target.result;
+                		let svg = div.querySelector('svg');
+                		element.elt = svg;
+
+		        		setupSvg(element);
+		        	} else {
+			            loadTelidonFromText(e2.target.result);
+		        	}
+		        }
+		        reader.readAsText(file, 'UTF-8');   
+			}
+
+			function loadTelidonFromText(input) {
+	            if (telidon.length >= maxLength) telidon.splice(0,1);
+	            telidon.push(new TelidonDraw([input], sW, sW));
+	            recording = true;
+	            preview.style.backgroundImage = null;
+			}
+
+			function onFormSubmit() {
+				const field = document.getElementById("naplps_field");
+				loadTelidonFromText(field.value);
+			}
+
+			function loadNewTelidon(fileName) { 
+			    loadStrings(fileName, function(response) {
+			        telidon = [];
+			        let reader = new FileReader();
+			        reader.onload = function(e2) {
+			            telidon.push(new TelidonDraw([e2.target.result], sW, sW));
+			            recording = true;
+			        }
+			        reader.readAsText(new Blob(response), 'UTF-8');
+			    });
+			}
+
+			function setPreview(name) {
+			    preview.style.backgroundImage = "url(./tools/rosetta_stone/cover/png/" + name + ".png)";
+			}
+
+			function setupGif() {
+			    gif = new GIF({
+			        workers: 4,
+			        workerScript: './js/libraries/gifjs/gif.worker.js', // https://github.com/jnordberg/gif.js/issues/59
+			        quality: 40
+			    });
+
+			    gif.on('finished', function(blob) {
+			        // https://developer.mozilla.org/en-US/docs/Web/API/HTMLMediaElement/srcObject
+			        let img = document.createElement('img');
+			        img.src = URL.createObjectURL(blob);
+			        img.style = "width: " + sW/2 + "px; height: " + sH/2 + "px; position: absolute; left: " + posCounterX + "px; top: " + (posCounterY + sH + 29) + "px;";
+			        posCounterX += sW/2;
+			        if (posCounterX > 1.5 * sW) {
+			            posCounterX = 0;
+			            posCounterY += sH/2;
+			        }
+			        document.body.appendChild(img);
+
+			        setupGif();
+			    });
+			}
+
+			function detectMobile() {
+			    if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|BB|PlayBook|IEMobile|Windows Phone|Kindle|Silk|Opera Mini/i.test(navigator.userAgent)) {
+			        return true;
+			    } else {
+			        return false;
+			    }
+			}		
+
+			// svg
+
+			function setupSvg(ps) {
+				let polylines, polygons, paths;
+				let input = [];
+				let offsetX = 0;
+				let offsetY = 0.25;
+
+			    let svgWidth = parseFloat(ps.attribute("width"));
+			    let svgHeight = parseFloat(ps.attribute("height"));
+			    if (!svgWidth || !svgHeight) {
+			    	let vb = (ps.attribute("viewBox") || "").trim().split(/[\s,]+/);
+			    	svgWidth  = vb.length >= 4 ? parseFloat(vb[2]) : 512;
+			    	svgHeight = vb.length >= 4 ? parseFloat(vb[3]) : 512;
+			    }
+
+		    	// NAPLPS can only use a fill color or a stroke color in one path, not both.
+				// fill-opacity, stroke-opacity, stroke-linecap, and stroke-width are not used.
+
+			    polygons = ps.query('polygon');
+				
+			    for (let path of polygons) {
+			    	let points = [];
+			    	let color = new Vector3(255, 255, 255);
+			    	let isFill = true;
+			    	
+					let strokeColorAttr = path.attribute("stroke"); // "#FEFEFE" or "none" 
+			    	let fillColorAttr = path.attribute("fill"); // "#FEFEFE" or "none" 			
+					
+					if (fillColorAttr !== "none") {
+						let colorHex = hexToRgb(fillColorAttr);
+						color = new Vector3(colorHex.r, colorHex.g, colorHex.b);
+					} else if (fillColorAttr === "none" && strokeColorAttr !== "none") {
+						let colorHex = hexToRgb(strokeColorAttr);
+						color = new Vector3(colorHex.r, colorHex.g, colorHex.b);
+					}
+
+			    	let pointsAttr = path.attribute("points").split(" ");
+			    	for (let pointAttr of pointsAttr) {
+			    		let pointAttrArray = pointAttr.split(",");
+			    		let point = new Vector2((float(pointAttrArray[0]) / sW) + offsetX, (float(pointAttrArray[1]/ sH * 0.75) + offsetY));
+			    		
+			    		if (point.x >= 0 && point.x <= 1 && point.y >= 0 && point.y <= 1) {
+			    			points.push(point);
+			    		}
+			    	}
+					
+					const stroke = new NapInputWrapper(color, points, isFill);
+					input.push(stroke);
+			    }
+
+			    polylines = ps.query('polyline');
+
+			    for (let path of polylines) {
+			    	let points = [];
+			    	let color = new Vector3(0, 0, 0);
+			    	let isFill = false;
+			    	
+					let strokeColorAttr = path.attribute("stroke"); // "#FEFEFE" or "none" 
+			    	let fillColorAttr = path.attribute("fill"); // "#FEFEFE" or "none" 
+					
+					if (strokeColorAttr === "none" && fillColorAttr !== "none") {
+						let colorHex = hexToRgb(fillColorAttr);
+						color = new Vector3(colorHex.r, colorHex.g, colorHex.b);
+					} else if (strokeColorAttr !== "none") {
+						let colorHex = hexToRgb(strokeColorAttr);
+						color = new Vector3(colorHex.r, colorHex.g, colorHex.b);
+					}
+
+			    	let pointsAttr = path.attribute("points").split(" ");
+			    	for (let pointAttr of pointsAttr) {
+			    		let pointAttrArray = pointAttr.split(",");
+			    		let point = new Vector2((float(pointAttrArray[0]) / sW) + offsetX, (float(pointAttrArray[1]/ sH * 0.75) + offsetY));
+			    		
+			    		if (point.x >= 0 && point.x <= 1 && point.y >= 0 && point.y <= 1) {
+							points.push(point);
+						}
+			    	}
+					
+					const stroke = new NapInputWrapper(color, points, isFill);
+					input.push(stroke);
+			    }
+
+			    paths = ps.query('path'); //ps.elt.querySelectorAll('path');
+
+			    for (let path of paths) {
+			    	let points = [];
+			    	let color = new Vector3(255, 255, 255);
+			    	let isFill = true;
+
+			    	let fillColorAttr = path.attribute('fill') || 'none';
+			    	let strokeColorAttr = path.attribute('stroke') || 'none';
+
+			    	if (fillColorAttr !== 'none') {
+			    		let colorHex = hexToRgb(fillColorAttr);
+			    		if (colorHex) color = new Vector3(colorHex.r, colorHex.g, colorHex.b);
+			    	} else if (fillColorAttr === 'none' && strokeColorAttr !== 'none') {
+			    		isFill = false;
+			    		let colorHex = hexToRgb(strokeColorAttr);
+			    		if (colorHex) color = new Vector3(colorHex.r, colorHex.g, colorHex.b);
+			    	} else {
+			    		color = new Vector3(255, 255, 255);
+			    	}
+
+			    	// Parse transform="translate(tx,ty)"
+			    	let tx = 0, ty = 0;
+			    	let transformAttr = path.attribute('transform');
+			    	if (transformAttr) {
+			    		let tMatch = /translate\(\s*(-?[\d.]+)\s*,\s*(-?[\d.]+)\s*\)/.exec(transformAttr);
+			    		if (tMatch) { tx = parseFloat(tMatch[1]); ty = parseFloat(tMatch[2]); }
+			    	}
+
+			    	// Parse d attribute: M/L commands only (Z closes the path, no coords)
+			    	let d = path.attribute('d') || '';
+			    	let cmdRegex = /[ML]\s*(-?[\d.]+),(-?[\d.]+)/g;
+			    	let m;
+			    	while ((m = cmdRegex.exec(d)) !== null) {
+			    		let px = parseFloat(m[1]) + tx;
+			    		let py = parseFloat(m[2]) + ty;
+			    		let point = new Vector2((px / svgWidth) + offsetX, ((py / svgHeight) * 0.75) + offsetY);
+			    		//if (point.x >= 0 && point.x <= 1 && point.y >= 0 && point.y <= 1) {
+			    		points.push(point);
+			    		//}
+			    	}
+
+			    	points = rdpSimplify(points, 0.01); // default 0.005, higher = more simplification
+
+			    	if (points.length > 0) {
+			    		const stroke = new NapInputWrapper(color, points, isFill);
+			    		input.push(stroke);
+			    	}
+			    }
+
+				const encoder = new NapEncoder(input);
+
+				// download nap
+				const _ts = new Date().toISOString().replace(/[-:]/g, '').replace('T', '_').split('.')[0];
+				const _blob = new Blob([encoder.napRaw], { type: 'text/plain' });
+				const _url = URL.createObjectURL(_blob);
+				const _a = document.createElement('a');
+				_a.href = _url;
+				_a.download = 'output_' + _ts + '.nap';
+				_a.click();
+				URL.revokeObjectURL(_url);
+
+				loadTelidonFromText(encoder.napRaw);				
+			}
+
+		function rdpSimplify(points, epsilon) {
+			if (points.length <= 2) return points;
+			let start = points[0], end = points[points.length - 1];
+			let maxDist = 0, maxIdx = 0;
+			for (let i = 1; i < points.length - 1; i++) {
+				let dist = rdpPointLineDist(points[i], start, end);
+				if (dist > maxDist) { maxDist = dist; maxIdx = i; }
+			}
+			if (maxDist > epsilon) {
+				let left = rdpSimplify(points.slice(0, maxIdx + 1), epsilon);
+				let right = rdpSimplify(points.slice(maxIdx), epsilon);
+				return left.slice(0, -1).concat(right);
+			}
+			return [start, end];
+		}
+
+		function rdpPointLineDist(p, a, b) {
+			let dx = b.x - a.x, dy = b.y - a.y;
+			let lenSq = dx * dx + dy * dy;
+			if (lenSq === 0) {
+				dx = p.x - a.x; dy = p.y - a.y;
+				return Math.sqrt(dx * dx + dy * dy);
+			}
+			let t = Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / lenSq));
+			dx = p.x - (a.x + t * dx); dy = p.y - (a.y + t * dy);
+			return Math.sqrt(dx * dx + dy * dy);
+		}
+
+		function hexToRgb(hex) {
+				let result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+				return result ? {
+					r: parseInt(result[1], 16),
+					g: parseInt(result[2], 16),
+					b: parseInt(result[3], 16)
+				} : null;
+			}
+
+			function componentToHex(c) {
+			  let hex = c.toString(16);
+			  return hex.length == 1 ? "0" + hex : hex;
+			}
+
+			function rgbToHex(r, g, b) {
+			  return "#" + componentToHex(r) + componentToHex(g) + componentToHex(b);
+			}	
+		</script>
+	</head>
+
+	<body>
+		<div id="container">
+			<div class="sketch">
+				&nbsp;&nbsp;<a href="https://github.com/n1ckfg/Telidon"><i>source</i></a>&nbsp;&nbsp;|&nbsp;&nbsp;
+				<a href="javascript:void(0)" id="shark">shark</a>&nbsp;&nbsp;|&nbsp;&nbsp;
+				<a href="javascript:void(0)" id="skull">skull</a>&nbsp;&nbsp;|&nbsp;&nbsp;
+				<a href="javascript:void(0)" id="santa">santa</a>&nbsp;&nbsp;|&nbsp;&nbsp;
+				<a href="javascript:void(0)" id="beer">beer</a>&nbsp;&nbsp;|&nbsp;&nbsp;
+				<a href="javascript:void(0)" id="haunt">haunt</a>&nbsp;&nbsp;|&nbsp;&nbsp;
+				<a href="javascript:void(0)" id="email">email</a>&nbsp;&nbsp;|&nbsp;&nbsp;
+				<a href="javascript:void(0)" id="mouse">mouse</a><br>
+			</div>
+
+			<div class="preview-base" id="preview"></div>
+
+			<div class="preview-base" id="explanation-bg"></div>
+			<div class="explanation-base" id="explanation">
+				<p>
+					<b><a href="https://github.com/n1ckfg/Telidon/blob/master/js/telidon/TelidonP5.js">TelidonP5.js</a></b> allows NAPLPS vector graphics files to be displayed in a browser using <a href="https://p5js.org/">p5.js</a>. It depends on a companion encoder/decoder library <b><a href="https://github.com/n1ckfg/Telidon/blob/master/js/telidon/naplps.js">naplps.js</a></b> can also be used separately.
+				</p>
+				<p>
+					August 15th, 2018 marked the 40th anniversary of the <a href="https://en.wikipedia.org/wiki/Telidon">Telidon</a> vector graphics workstation, launched in 1978. The Telidon hardware was discontinued in 1985, but its file format, standardized as <a href="https://en.wikipedia.org/wiki/NAPLPS">NAPLPS</a>, thrived and remained in wide use throughout the <a href="https://en.wikipedia.org/wiki/Bulletin_board_system">BBS</a> era, until the mid-1990s. Thanks to its exceptionally small file size and limited animation features, NAPLPS can be seen as a technological ancestor of the <a href="https://en.wikipedia.org/wiki/GIF#Animated_GIF">animated GIF</a> and the <a href="https://en.wikipedia.org/wiki/SWF">Flash SWF</a>&mdash;a new artistic medium that could be both produced and distributed on the same machine.
+				</p>
+				<p>
+					From 1982&ndash;1985, members of the Toronto arts org <a href="http://interaccess.org/">InterAccess</a> used Telidon systems to produce an ambitious series of <a href="https://motherboard.vice.com/en_us/article/ezveak/the-original-net-artists">interactive BBS-based artworks</a> in the format.
+				</p>
+				<!--
+				<p>
+					Three anniversary events were held at InterAccess in spring 2018:<br/>
+					<a href="http://interaccess.org/event/2018/naplps-adventure-new-media-art-history">http://interaccess.org/event/2018/naplps-adventure-new-media-art-history</a><br/>
+					<a href="http://interaccess.org/event/2018/digital-archaeology-excavating-telidon">http://interaccess.org/event/2018/digital-archaeology-excavating-telidon</a><br/>
+					<a href="http://interaccess.org/exhibition/telidon">http://interaccess.org/exhibition/telidon</a>
+				</p>
+				-->
+				<p>
+					Nick Fox-Gieg&nbsp;&nbsp;/&nbsp;&nbsp;180326
+				</p>
+			</div>
+			<div id="naplps_field_container">
+				<form>
+					<label style="color: #ffffff;" for="naplps_field">NAPLPS Text: </label>
+					<input type="text" id="naplps_field" name="naplps_field"><br><br>
+  					<input type="button" onclick="onFormSubmit()" value="Submit">
+				</form> 
+			<div>
+		</div>
+	</body>
+
+</html>

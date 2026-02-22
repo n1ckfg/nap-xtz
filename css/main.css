@@ -1,0 +1,146 @@
+/* BEGIN CONDITIONALS */
+@media only screen and (orientation:landscape) {
+	.preview-base {
+		width: 640px;
+		height: 511px;
+		position:absolute;
+		left: 640px;
+		top: -2px;
+	}
+
+	.explanation-base {
+		width: 600px;
+		height: 511px;
+		position:absolute;
+		left: 640px;
+		top: 0.75em;
+		padding:0.75em;
+	}
+
+	#container {
+		width: 1280px;
+		height: 511px;
+		position: absolute;
+		left: 0px;
+		top: 0px;
+	}
+
+	#naplps_field_container {
+		position: absolute;
+		left: 650px;
+		top: 400px;
+		z-index: 1;
+		width:178px;
+		height: 80px;
+		border: 1px solid black;
+		border-radius: 0.5em;
+		padding: 0.5em;
+		margin: 0px;
+		background-color: #000000;
+		opacity: 0.8;
+	}
+
+	#canvas {
+		/* */
+	}
+
+	.sketch {
+		position: absolute;
+		width: 640px;
+		height: 511px;
+		top: 4px;
+		left: 0px;
+	}
+}
+
+@media only screen and (orientation:portrait) {
+	.preview-base {
+		display: none;
+		width: 0px;
+		height: 0px;
+		position: absolute;
+		left: 0px;
+		top: 0px;
+		margin: 0px;
+	}
+
+	#naplps_field_container {
+		display: none;
+		width: 0px;
+		height: 0px;
+		position: absolute;
+		left: 0px;
+		top: 0px;
+		margin: 0px;
+	}
+
+	.explanation-base {
+		display: none;
+		width: 0px;
+		height: 0px;
+		position: absolute;
+		left: 0px;
+		top: 0px;
+		margin: 0px;
+	}
+
+	#container {
+		width: 640px;
+		height: 511px;
+		position: absolute;
+		left: 0px;
+		top: 0px;
+	}
+
+	canvas {
+		position: absolute;
+		left: 0px;
+		top: 0px;
+		margin-top: 140px;
+		margin-left: 168px;
+		transform: scale(1.5);
+	}
+
+	.sketch {
+		position: absolute;
+		width: 960px;
+		height: 511px;
+		top: 4px;
+		left: 0px;
+		font-size: 1.75em;
+	}
+}
+/* END CONDITIONALS */
+
+body {
+	background: #aaaaaa;
+	font-size: 17px;
+	font-family: "Arial", "Helvetica", "sans-serif";
+}
+
+a {
+	text-decoration: underline;
+}
+
+a:hover {
+	text-decoration: none;
+}
+
+#preview {
+	/* */
+}
+
+#explanation {
+	font-size: 0.975em;
+	text-shadow: 2px 2px 2px #000000;
+	color: #ffffff;	
+}
+
+#explanation-bg {
+	background: #002244;
+	opacity: 0.75;
+}
+
+.explanation-base a {
+	color: #ffffff;
+}
