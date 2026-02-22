@@ -3,15 +3,8 @@
 
 	<head>
 		<title>NAPLPS x XTZ</title>
-		<!-- unsafe-eval is required by the Beacon SDK browser bundle (uses new Function() internally) -->
-		<meta http-equiv="Content-Security-Policy" content="
-			default-src 'self' data: blob:;
-			script-src  'self' 'unsafe-eval' 'unsafe-inline' https://unpkg.com blob:;
-			connect-src 'self' https: wss:;
-			img-src     'self' data: blob:;
-			worker-src  'self' blob:;
-			style-src   'self' 'unsafe-inline';
-		">
+		<!-- unsafe-eval: required by Beacon SDK (uses new Function() internally). frame-src/ws: required for WalletConnect iframe and local wallet discovery. -->
+		<meta http-equiv="Content-Security-Policy" content="default-src 'self' data: blob:; script-src 'self' 'unsafe-eval' 'unsafe-inline' https://unpkg.com blob:; connect-src 'self' https: wss: ws:; img-src 'self' data: blob: https:; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; frame-src https:;">
 		<link type="text/css" rel="stylesheet" href="./css/main.css"/>
 		<script type="text/javascript" src="./js/libraries/p5js/p5.min.js"></script>
 		<script type="text/javascript" src="./js/libraries/p5js/p5.dom.min.js"></script>
@@ -378,8 +371,10 @@
 
 				// Expose encoded NAPLPS for the Tezos mint flow.
 				window.pendingNapRaw = encoder.napRaw;
+				console.log('[nap-xtz] SVG encoded to NAPLPS, length:', encoder.napRaw.length);
 				const btnMint = document.getElementById('btn-mint');
 				if (btnMint) btnMint.style.display = 'inline-block';
+				if (typeof setStatus === 'function') setStatus('SVG encoded — click Mint to Tezos to publish on-chain');
 
 				loadTelidonFromText(encoder.napRaw);
 			}
@@ -443,10 +438,10 @@
 				<a href="javascript:void(0)" id="five">five</a>&nbsp;&nbsp;|&nbsp;&nbsp;
 				<a href="javascript:void(0)" id="six">six</a>&nbsp;&nbsp;|&nbsp;&nbsp;
 				<a href="javascript:void(0)" id="seven">seven</a>&nbsp;&nbsp;|&nbsp;&nbsp;
-				<button id="btn-connect"    class="tezos-btn" onclick="connectWallet()">Connect Wallet</button>
+				<button id="btn-connect" class="tezos-btn" onclick="connectWallet()">Connect Wallet</button>
 				<button id="btn-disconnect" class="tezos-btn" onclick="disconnectWallet()" style="display:none">Disconnect</button>
-				<span id="tezos-address" class="tezos-address"></span>&nbsp;
 				<button id="btn-mint" class="tezos-btn" onclick="mintCurrentNaplps()" style="display:none">Mint to Tezos</button>&nbsp;
+				<span id="tezos-address" class="tezos-address"></span>&nbsp;
 				<span id="tezos-status" class="tezos-status"></span><br>
 			</div>
 

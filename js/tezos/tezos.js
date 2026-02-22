@@ -76,6 +76,18 @@ async function initTezos() {
             network: { type: networkType }
         });
 
+        // Beacon SDK v4+ requires an explicit subscriber for ACTIVE_ACCOUNT_SET
+        // to avoid "no active subscription" warnings on every account change.
+        if (SDK.BeaconEvent && _beaconClient.subscribeToEvent) {
+            await _beaconClient.subscribeToEvent(
+                SDK.BeaconEvent.ACTIVE_ACCOUNT_SET,
+                (account) => {
+                    _activeAccount = account || null;
+                    updateWalletUI();
+                }
+            );
+        }
+
         // Restore an existing wallet session on page load.
         const existing = await _beaconClient.getActiveAccount();
         if (existing) {
@@ -97,9 +109,11 @@ async function connectWallet() {
     if (!_beaconClient) { setStatus("SDK not ready", true); return; }
     try {
         setStatus("Opening wallet…");
+        console.log("[nap-xtz] requestPermissions…");
         // Network was set at DAppClient construction — do not pass it here.
         await _beaconClient.requestPermissions();
         _activeAccount = await _beaconClient.getActiveAccount();
+        console.log("[nap-xtz] connected:", _activeAccount?.address);
         updateWalletUI();
         setStatus("Wallet connected");
 
@@ -130,30 +144,42 @@ async function disconnectWallet() {
 
 // ─── Minting ──────────────────────────────────────────────────────────────────
 async function mintCurrentNaplps() {
-    if (!_beaconClient || !_activeAccount) {
-        setStatus("Connect wallet first", true);
-        return;
-    }
+    console.log("[nap-xtz] mintCurrentNaplps called");
+
     const napRaw = window.pendingNapRaw;
     if (!napRaw) {
-        setStatus("No NAPLPS data — drop an SVG first", true);
+        setStatus("Drop an SVG first", true);
+        console.warn("[nap-xtz] no pendingNapRaw");
         return;
     }
     if (CONTRACT_ADDRESS === "KT1PLACEHOLDER") {
         setStatus("Contract not deployed — set CONTRACT_ADDRESS in tezos.js", true);
         return;
     }
+
+    // Auto-connect if no wallet is active yet.
+    if (!_activeAccount) {
+        console.log("[nap-xtz] no active account — triggering connectWallet");
+        await connectWallet();
+        if (!_activeAccount) {
+            console.warn("[nap-xtz] wallet connection cancelled or failed");
+            return;
+        }
+    }
+
     try {
         setStatus("Sending mint transaction…");
-        await mintNaplpsToken(napRaw);
+        console.log("[nap-xtz] calling mintNaplpsToken, napRaw length:", napRaw.length);
+        const result = await mintNaplpsToken(napRaw);
+        console.log("[nap-xtz] requestOperation result:", result);
         setStatus("Transaction sent — waiting for confirmation…");
-        // Poll after ~30 s to let the block confirm and TzKT index it.
+        // Ghostnet block time ~15 s; allow two blocks + TzKT indexing lag.
         setTimeout(async () => {
             await loadLatestToken();
-        }, 30000);
+        }, 45000);
     } catch (e) {
-        console.error("mintCurrentNaplps:", e);
-        setStatus("Mint failed: " + e.message, true);
+        console.error("[nap-xtz] mint error:", e);
+        setStatus("Mint failed: " + (e.message || e), true);
     }
 }
 
@@ -198,22 +224,20 @@ async function mintNaplpsToken(napRaw) {
 
 // ─── Reading from chain ───────────────────────────────────────────────────────
 async function loadLatestToken() {
-    if (CONTRACT_ADDRESS === "KT1PLACEHOLDER") {
-        // No contract yet — nothing to load.
-        return;
-    }
+    if (CONTRACT_ADDRESS === "KT1PLACEHOLDER") return;
     try {
         setStatus("Loading latest token from chain…");
         const napRaw = await readLatestNaplps();
         if (napRaw) {
-            // Delegate to the existing p5.js renderer in index.html.
+            console.log("[nap-xtz] loaded from chain, NAPLPS length:", napRaw.length);
             loadTelidonFromText(napRaw);
             setStatus("Latest token loaded from chain");
         } else {
+            console.log("[nap-xtz] no tokens on chain yet");
             setStatus("No tokens on chain yet");
         }
     } catch (e) {
-        console.warn("loadLatestToken:", e);
+        console.warn("[nap-xtz] loadLatestToken error:", e);
         setStatus("Chain read failed — using local samples");
     }
 }
@@ -223,28 +247,29 @@ async function readLatestNaplps() {
     const storageResp = await fetch(
         `${TZKT_BASE}/contracts/${CONTRACT_ADDRESS}/storage`
     );
-    if (!storageResp.ok) {
-        throw new Error("Storage fetch failed: " + storageResp.status);
-    }
+    if (!storageResp.ok) throw new Error("Storage fetch failed: " + storageResp.status);
     const storage = await storageResp.json();
+    console.log("[nap-xtz] storage:", storage);
 
     const nextId = parseInt(storage.next_token_id || "0", 10);
     if (isNaN(nextId) || nextId === 0) return null;
 
     const latestId = nextId - 1;
+    console.log("[nap-xtz] fetching token_metadata key:", latestId);
 
     // 2. Fetch the token_metadata bigmap entry for the latest token.
     const keyResp = await fetch(
         `${TZKT_BASE}/contracts/${CONTRACT_ADDRESS}/bigmaps/token_metadata/keys/${latestId}`
     );
-    if (!keyResp.ok) {
-        throw new Error("Bigmap key fetch failed: " + keyResp.status);
-    }
+    if (!keyResp.ok) throw new Error("Bigmap key fetch failed: " + keyResp.status);
     const entry = await keyResp.json();
+    console.log("[nap-xtz] bigmap entry:", entry);
 
-    // TzKT decodes `bytes` values as lowercase hex strings.
     const hexNaplps = entry?.value?.token_info?.naplps;
-    if (!hexNaplps) return null;
+    if (!hexNaplps) {
+        console.warn("[nap-xtz] no 'naplps' key in token_info:", entry?.value?.token_info);
+        return null;
+    }
 
     return hexToString(hexNaplps);
 }
