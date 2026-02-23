@@ -34,7 +34,7 @@ function hexToString(hex) {
 function setStatus(msg, isError) {
     const el = document.getElementById("tezos-status");
     if (!el) return;
-    el.textContent = msg;
+    el.innerHTML = msg;
     el.style.color = isError ? "#ff6666" : "#ffcc00";
 }
 
@@ -248,11 +248,17 @@ async function loadLatestToken() {
     if (CONTRACT_ADDRESS === "KT1PLACEHOLDER") return;
     try {
         setStatus("Loading latest token from chain...");
-        const napRaw = await readLatestNaplps();
-        if (napRaw) {
+        const result = await readLatestNaplps();
+        if (result) {
+            const { napRaw, latestId } = result;
             console.log("[nap-xtz] loaded from chain, NAPLPS length:", napRaw.length);
             loadTelidonFromText(napRaw);
-            setStatus("Latest token loaded from chain");
+            
+            // If we have an operation hash, use that as the link.
+            // Otherwise, fall back to the token view.
+            const link = `https://ghostnet.tzkt.io/${CONTRACT_ADDRESS}/operations/`; //${latestId}`;
+            
+            setStatus(`<a href="${link}" target="_blank" style="color: inherit; text-decoration: underline;">Latest token</a> loaded from chain`);
         } else {
             console.log("[nap-xtz] no tokens on chain yet");
             setStatus("No tokens on chain yet");
@@ -292,5 +298,10 @@ async function readLatestNaplps() {
         return null;
     }
 
-    return hexToString(hexNaplps);
+    console.log("Token url: " + "https://ghostnet.tzkt.io/" + entry.hash + "/" + entry.id);
+
+    return {
+        napRaw: hexToString(hexNaplps),
+        latestId: latestId
+    };
 }
