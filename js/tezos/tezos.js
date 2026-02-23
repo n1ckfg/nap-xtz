@@ -46,7 +46,7 @@ function setSize(msg, isError) {
         el.textContent = "size: " + msg + " ... too large";
     } else {
         el.style.color = "#ccff00";
-        el.textContent = "size: " + msg + " ... ready";
+        el.textContent = "size: " + msg + " ... ready to publish";
     }
 }
 
