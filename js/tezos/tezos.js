@@ -160,14 +160,14 @@ async function mintCurrentNaplps() {
 
     const napRaw = window.pendingNapRaw;
     if (!napRaw) {
-        setStatus("Drop an SVG first", true);
+        setStatus("Load some NAPLPS graphics first", true);
         console.warn("[nap-xtz] no pendingNapRaw");
         return;
     }
 
     // Tezos operations have a ~32KB hard limit. If napRaw is too large, it will time out or fail.
     if (napRaw.length > 30000) {
-        setStatus(`NAPLPS too large (${(napRaw.length / 1024).toFixed(1)} KB). Max 30 KB. Try a simpler SVG.`, true);
+        setStatus(`NAPLPS too large (${(napRaw.length / 1024).toFixed(1)} KB). Max 30 KB. Try a simpler image.`, true);
         console.warn("[nap-xtz] napRaw too large:", napRaw.length);
         return;
     }

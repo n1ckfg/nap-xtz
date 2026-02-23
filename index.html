@@ -171,6 +171,7 @@
 			}
 
 			function loadTelidonFromText(input, doClear=true) {
+				window.pendingNapRaw = input;
 				if (doClear) {
 					telidon = []
 				} else {
@@ -191,6 +192,7 @@
 			        telidon = [];
 			        let reader = new FileReader();
 			        reader.onload = function(e2) {
+			        	window.pendingNapRaw = e2.target.result;
 			            telidon.push(new TelidonDraw([e2.target.result], sW, sW));
 			            recording = true;
 						setSize(e2.target.result.length);
