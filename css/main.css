@@ -1,124 +1,3 @@
-/* BEGIN CONDITIONALS */
-@media only screen and (orientation:landscape) {
-	.preview-base {
-		width: 640px;
-		height: 511px;
-		position:absolute;
-		left: 640px;
-		top: -2px;
-	}
-
-	.explanation-base {
-		width: 600px;
-		height: 511px;
-		position:absolute;
-		left: 640px;
-		top: 0.75em;
-		padding:0.75em;
-	}
-
-	#container {
-		width: 640px;
-		height: 511px;
-		position: absolute;
-		left: 0px;
-		top: 0px;
-		z-index: 10;
-	}
-
-	#naplps_field_container {
-		position: absolute;
-		left: 12px;
-		top: 520px;
-		z-index: 1;
-		width:400px;
-		height: 80px;
-		border: 1px solid black;
-		border-radius: 0.5em;
-		padding: 0.5em;
-		margin: 0px;
-		background-color: #000000;
-		opacity: 0.8;
-	}
-
-	#canvas {
-		/* */
-	}
-
-	.sketch {
-		position: absolute;
-		width: 640px;
-		height: 511px;
-		top: 4px;
-		left: 0px;
-	}
-}
-
-@media only screen and (orientation:portrait) {
-	.preview-base {
-		display: none;
-		width: 0px;
-		height: 0px;
-		position: absolute;
-		left: 0px;
-		top: 0px;
-		margin: 0px;
-	}
-
-	#naplps_field_container {
-		position: absolute;
-		left: 12px;
-		top: 520px;
-		z-index: 1;
-		width:400px;
-		height: 80px;
-		border: 1px solid black;
-		border-radius: 0.5em;
-		padding: 0.5em;
-		margin: 0px;
-		background-color: #000000;
-		opacity: 0.8;
-	}
-
-	.explanation-base {
-		display: none;
-		width: 0px;
-		height: 0px;
-		position: absolute;
-		left: 0px;
-		top: 0px;
-		margin: 0px;
-	}
-
-	#container {
-		width: 640px;
-		height: 511px;
-		position: absolute;
-		left: 0px;
-		top: 0px;
-		z-index: 10;
-	}
-
-	canvas {
-		position: absolute;
-		left: 0px;
-		top: 0px;
-		margin-top: 140px;
-		margin-left: 168px;
-		transform: scale(1.5);
-	}
-
-	.sketch {
-		position: absolute;
-		width: 960px;
-		height: 511px;
-		top: 4px;
-		left: 0px;
-		font-size: 1.75em;
-	}
-}
-/* END CONDITIONALS */
-
 body {
 	background: #aaaaaa;
 	font-size: 17px;
@@ -131,6 +10,59 @@ a {
 
 a:hover {
 	text-decoration: none;
+}
+
+.preview-base {
+	width: 640px;
+	height: 511px;
+	position:absolute;
+	left: 640px;
+	top: -2px;
+}
+
+.explanation-base {
+	width: 600px;
+	height: 511px;
+	position:absolute;
+	left: 640px;
+	top: 0.75em;
+	padding:0.75em;
+}
+
+#container {
+	width: 640px;
+	height: 511px;
+	position: absolute;
+	left: 0px;
+	top: 0px;
+	z-index: 10;
+}
+
+#naplps_field_container {
+	position: absolute;
+	left: 12px;
+	top: 520px;
+	z-index: 1;
+	width:400px;
+	height: 120px;
+	border: 1px solid black;
+	border-radius: 0.5em;
+	padding: 0.5em;
+	margin: 0px;
+	background-color: #000000;
+	opacity: 0.8;
+}
+
+#canvas {
+	/* */
+}
+
+.sketch {
+	position: absolute;
+	width: 640px;
+	height: 511px;
+	top: 4px;
+	left: 0px;
 }
 
 #preview {
@@ -180,4 +112,10 @@ a:hover {
 	font-size: 0.82em;
 	vertical-align: middle;
 	font-family: monospace;
+}
+
+.tezos-size {
+	color: #ffcc00;
+	font-size: 0.82em;
+	vertical-align: middle;
 }

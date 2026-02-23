@@ -38,6 +38,18 @@ function setStatus(msg, isError) {
     el.style.color = isError ? "#ff6666" : "#ffcc00";
 }
 
+function setSize(msg, isError) {
+    const el = document.getElementById("tezos-size");
+    if (!el) return;
+    el.textContent = "size: " + msg;
+    if (isError || parseInt(msg) > 30000) {
+        el.style.color = "#ff6666";
+    } else {
+        el.style.color = "#ccff00";
+    }
+}
+
+
 function updateWalletUI() {
     const btnConnect    = document.getElementById("btn-connect");
     const btnDisconnect = document.getElementById("btn-disconnect");

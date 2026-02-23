@@ -170,15 +170,20 @@
 		        reader.readAsText(file, 'UTF-8');   
 			}
 
-			function loadTelidonFromText(input) {
-	            if (telidon.length >= maxLength) telidon.splice(0,1);
+			function loadTelidonFromText(input, doClear=true) {
+				if (doClear) {
+					telidon = []
+				} else {
+	            	if (telidon.length >= maxLength) telidon.splice(0,1);
+				}
 	            telidon.push(new TelidonDraw([input], sW, sW));
 	            recording = true;
+				setSize(input.length);
 			}
 
 			function onFormSubmit() {
 				const field = document.getElementById("naplps_field");
-				loadTelidonFromText(field.value);
+				loadTelidonFromText(field.value, false);
 			}
 
 			function loadNewTelidon(fileName) { 
@@ -188,6 +193,7 @@
 			        reader.onload = function(e2) {
 			            telidon.push(new TelidonDraw([e2.target.result], sW, sW));
 			            recording = true;
+						setSize(e2.target.result.length);
 			        }
 			        reader.readAsText(new Blob(response), 'UTF-8');
 			    });
@@ -478,7 +484,7 @@
 			<div id="naplps_field_container">
 				<div>
 					<form>
-						<label style="color: #ffffff;" for="naplps_field">NAPLPS Text: </label><br>
+						<label style="color: #ffffff;" for="naplps_field">Add NAPLPS Text: </label><br>
 						<input type="text" id="naplps_field" name="naplps_field"><br>
 	  					<input type="button" onclick="onFormSubmit()" value="Submit">
 					</form> 
@@ -487,8 +493,9 @@
 					<button id="btn-connect" class="tezos-btn" onclick="connectWallet()">Connect Wallet</button>
 					<button id="btn-disconnect" class="tezos-btn" onclick="disconnectWallet()" style="display:none">Disconnect</button><br>
 					<button id="btn-mint" class="tezos-btn" onclick="mintCurrentNaplps()">Mint to Tezos</button><br>
-					<span id="tezos-address" class="tezos-address"></span>&nbsp;
+					<span id="tezos-address" class="tezos-address"></span><br>
 					<span id="tezos-status" class="tezos-status"></span><br>
+					<span id="tezos-size" class="tezos-size"></span><br>
 				</div>
 			<div>
 		</div>
