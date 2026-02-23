@@ -41,7 +41,8 @@
 			function preload() {
 			    isMobile = detectMobile();
 
-			    if (isMobile) loadNewTelidon("./images/output_20260222_181752.nap");
+			    //if (isMobile) 
+			    loadNewTelidon("./images/output_20260222_181752.nap");
 			}
 
 			function setup() {
@@ -74,6 +75,10 @@
 				document.getElementById("latest").addEventListener("click", function() {
                     telidon = [];
 			        loadLatestToken();
+			    });
+				
+				document.getElementById("clear").addEventListener("click", function() {
+                    telidon = [];
 			    });
 
 			    document.getElementById("one").addEventListener("click", function() {
@@ -452,6 +457,7 @@
 			<div class="sketch">
 				&nbsp;&nbsp;<a href="https://github.com/n1ckfg/nap-xtz"><i>source</i></a>&nbsp;&nbsp;|&nbsp;&nbsp;
 				<a href="javascript:void(0)" id="latest"><i>latest</i></a>&nbsp;&nbsp;|&nbsp;&nbsp;
+				<a href="javascript:void(0)" id="clear"><i>clear</i></a>&nbsp;&nbsp;|&nbsp;&nbsp;
 				<a href="javascript:void(0)" id="one">one</a>&nbsp;&nbsp;|&nbsp;&nbsp;
 				<a href="javascript:void(0)" id="two">two</a>&nbsp;&nbsp;|&nbsp;&nbsp;
 				<a href="javascript:void(0)" id="three">three</a>&nbsp;&nbsp;|&nbsp;&nbsp;
