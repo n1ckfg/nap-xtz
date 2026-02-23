@@ -41,11 +41,12 @@ function setStatus(msg, isError) {
 function setSize(msg, isError) {
     const el = document.getElementById("tezos-size");
     if (!el) return;
-    el.textContent = "size: " + msg;
     if (isError || parseInt(msg) > 30000) {
         el.style.color = "#ff6666";
+        el.textContent = "size: " + msg + " ... too large";
     } else {
         el.style.color = "#ccff00";
+        el.textContent = "size: " + msg + " ... ready";
     }
 }
 

@@ -9,7 +9,7 @@
 		<script type="text/javascript" src="./js/libraries/p5js/p5.min.js"></script>
 		<script type="text/javascript" src="./js/libraries/p5js/p5.dom.min.js"></script>
 		<script type="text/javascript" src="./js/libraries/p5js/p5.svg.js"></script>
-		<script type="text/javascript" src="./js/libraries/gifjs/gif.js"></script>
+		<!--<script type="text/javascript" src="./js/libraries/gifjs/gif.js"></script>-->
 		<script type="text/javascript" src="./js/telidon/naplps.js"></script>
 		<script type="text/javascript" src="./js/telidon/TelidonP5.js"></script>
 		<script type="text/javascript" src="https://unpkg.com/@airgap/beacon-dapp/dist/walletbeacon.dapp.min.js"></script>
@@ -19,7 +19,7 @@
 
 			let recording = true;
 			let c;
-			let gif;
+			//let gif;
 			let posCounterX = 0;
 			let posCounterY = 0;
 
@@ -48,7 +48,7 @@
 				c = createCanvas(sW, sH);
 				c.position(0, 29);
 
-			    if (!isMobile) setupGif();
+			    //if (!isMobile) setupGif();
 
 				dropZone = document.getElementsByTagName("body")[0];
 			    dropZone.addEventListener('dragover', onDragOver);
@@ -131,6 +131,7 @@
 					telidon[i].draw();
 				}
 
+			    /*
 			    if (!isMobile && recording && frameCount % 2 == 0) {
 			        gif.addFrame(c.elt, {delay: 1, copy: true});
 			    }
@@ -139,6 +140,7 @@
 			        recording = false;
 			        gif.render();
 			    }
+			    */
 			}
 
 			// Show the copy icon when dragging over.  Seems to only work for chrome.
@@ -205,6 +207,7 @@
 			//    preview.style.backgroundImage = "url(./tools/rosetta_stone/cover/png/" + name + ".png)";
 			//}
 
+			/*
 			function setupGif() {
 			    gif = new GIF({
 			        workers: 4,
@@ -227,6 +230,7 @@
 			        setupGif();
 			    });
 			}
+			*/
 
 			function detectMobile() {
 			    if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|BB|PlayBook|IEMobile|Windows Phone|Kindle|Silk|Opera Mini/i.test(navigator.userAgent)) {
@@ -390,7 +394,7 @@
 				console.log('[nap-xtz] SVG encoded to NAPLPS, length:', encoder.napRaw.length);
 				const btnMint = document.getElementById('btn-mint');
 				if (btnMint) btnMint.style.display = 'inline-block';
-				if (typeof setStatus === 'function') setStatus('SVG encoded — click Mint to Tezos to publish on-chain');
+				if (typeof setStatus === 'function') setStatus('SVG encoded — click Mint to publish');
 
 				loadTelidonFromText(encoder.napRaw);
 			}
