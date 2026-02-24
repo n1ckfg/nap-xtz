@@ -193,7 +193,7 @@ async function mintCurrentNaplps() {
         console.log("[nap-xtz] calling mintNaplpsToken, napRaw length:", napRaw.length);
         const result = await mintNaplpsToken(napRaw);
         console.log("[nap-xtz] requestOperation result:", result);
-        setStatus("Transaction sent — waiting for confirmation...");
+        setStatus("Transaction sent, waiting for confirmation...");
         // Ghostnet block time ~15 s; allow two blocks + TzKT indexing lag.
         setTimeout(async () => {
             await loadLatestToken();
