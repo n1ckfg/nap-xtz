@@ -4,8 +4,25 @@
 	<head>
 		<title>NAPLPS x XTZ</title>
 		<!-- unsafe-eval: required by Beacon SDK (uses new Function() internally). frame-src/ws: required for WalletConnect iframe and local wallet discovery. -->
-		<meta http-equiv="Content-Security-Policy" content="default-src 'self' data: blob:; script-src 'self' 'unsafe-eval' 'unsafe-inline' https://unpkg.com blob:; connect-src 'self' https: wss: ws:; img-src 'self' data: blob: https:; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; frame-src https:;">
+		<meta http-equiv="Content-Security-Policy" content="default-src 'self' data: blob:; script-src 'self' 'unsafe-eval' 'unsafe-inline' https://unpkg.com https://cdn.jsdelivr.net blob:; connect-src 'self' https: wss: ws: blob:; img-src 'self' data: blob: https:; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; frame-src https:;">
 		<link type="text/css" rel="stylesheet" href="./css/main.css"/>
+
+		<!-- Three.js library for drawing mode -->
+		<script type="importmap">
+			{
+				"imports": {
+					"three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+					"three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+				}
+			}
+		</script>
+
+		<!-- Load MediaPipe Tasks as a Module and expose to window -->
+		<script type="module">
+			import { GestureRecognizer, FilesetResolver } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3";
+			window.GestureRecognizer = GestureRecognizer;
+			window.FilesetResolver = FilesetResolver;
+		</script>
 		<script type="text/javascript" src="./js/libraries/p5js/p5.min.js"></script>
 		<script type="text/javascript" src="./js/libraries/p5js/p5.dom.min.js"></script>
 		<script type="text/javascript" src="./js/libraries/p5js/p5.svg.js"></script>
@@ -510,8 +527,38 @@
 					<span id="tezos-status" class="tezos-status"></span><br>
 					<span id="tezos-size" class="tezos-size"></span><br>
 				</div>
-			<div>
+				<button id="btn-live-drawing">Live Drawing</button>
+			</div>
 		</div>
+
+		<!-- Drawing mode container (fullscreen overlay) -->
+		<div id="drawing-container">
+			<div id="loading">Loading MediaPipe...</div>
+			<video id="webcam" autoplay playsinline></video>
+			<div id="labels-container"></div>
+			<div id="reset-overlay">
+				<div id="reset-circle-left"></div>
+				<div id="reset-circle-right"></div>
+			</div>
+			<button id="btn-exit-drawing">Exit Drawing</button>
+		</div>
+
+		<!-- Drawing mode script -->
+		<script type="module">
+			import { startDrawingMode, stopDrawingMode } from './js/drawing/drawing.js';
+
+			document.getElementById('btn-live-drawing').addEventListener('click', async () => {
+				const container = document.getElementById('drawing-container');
+				container.classList.add('active');
+				await startDrawingMode(container);
+			});
+
+			document.getElementById('btn-exit-drawing').addEventListener('click', () => {
+				stopDrawingMode();
+				const container = document.getElementById('drawing-container');
+				container.classList.remove('active');
+			});
+		</script>
 	</body>
 
 </html>

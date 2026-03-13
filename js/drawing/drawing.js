@@ -70,6 +70,8 @@ let orientationFadeStart = null;
 const ORIENTATION_FADE_DURATION = 5000; // 5 seconds
 
 async function setupMediaPipe() {
+    const container = window._drawingContainer || document;
+
     // Wait for MediaPipe to be defined on the window
     while (!window.GestureRecognizer || !window.FilesetResolver) {
         await new Promise(resolve => setTimeout(resolve, 100));
@@ -78,7 +80,7 @@ async function setupMediaPipe() {
     const vision = await window.FilesetResolver.forVisionTasks(
         "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm"
     );
-    
+
     gestureRecognizer = await window.GestureRecognizer.createFromOptions(vision, {
         baseOptions: {
             modelAssetPath: "https://storage.googleapis.com/mediapipe-models/gesture_recognizer/gesture_recognizer/float16/1/gesture_recognizer.task",
@@ -88,10 +90,13 @@ async function setupMediaPipe() {
         numHands: MAX_HANDS
     });
     console.log("MediaPipe Loaded");
-    document.getElementById('loading').style.display = 'none';
+    const loadingEl = container.querySelector('#loading') || document.getElementById('loading');
+    if (loadingEl) loadingEl.style.display = 'none';
 }
 
 function initThreeJS() {
+    const container = window._drawingContainer || document.body;
+
     scene = new THREE.Scene();
     scene.background = new THREE.Color(0x222222);
 
@@ -101,7 +106,7 @@ function initThreeJS() {
     // Set up renderer
     renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
-    document.body.appendChild(renderer.domElement);
+    // Don't append here - startDrawingMode will handle it
 
     // Add some lighting
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
@@ -110,7 +115,7 @@ function initThreeJS() {
     directionalLight.position.set(0, 5, 5);
     scene.add(directionalLight);
 
-    labelsContainer = document.getElementById('labels-container');
+    labelsContainer = container.querySelector('#labels-container') || document.getElementById('labels-container');
 
     // Create World Node and test cubes
     worldNode = new THREE.Group();
@@ -220,13 +225,17 @@ function initThreeJS() {
     frame = new Frame(worldNode);
 
     // Initialize undo/reset overlay
-    undoOverlay = document.getElementById('reset-overlay');
-    undoCircleLeft = document.getElementById('reset-circle-left');
-    undoCircleRight = document.getElementById('reset-circle-right');
-    undoCircleLeft.style.width = UNDO_CIRCLE_MAX_SIZE + 'px';
-    undoCircleLeft.style.height = UNDO_CIRCLE_MAX_SIZE + 'px';
-    undoCircleRight.style.width = UNDO_CIRCLE_MAX_SIZE + 'px';
-    undoCircleRight.style.height = UNDO_CIRCLE_MAX_SIZE + 'px';
+    undoOverlay = container.querySelector('#reset-overlay') || document.getElementById('reset-overlay');
+    undoCircleLeft = container.querySelector('#reset-circle-left') || document.getElementById('reset-circle-left');
+    undoCircleRight = container.querySelector('#reset-circle-right') || document.getElementById('reset-circle-right');
+    if (undoCircleLeft) {
+        undoCircleLeft.style.width = UNDO_CIRCLE_MAX_SIZE + 'px';
+        undoCircleLeft.style.height = UNDO_CIRCLE_MAX_SIZE + 'px';
+    }
+    if (undoCircleRight) {
+        undoCircleRight.style.width = UNDO_CIRCLE_MAX_SIZE + 'px';
+        undoCircleRight.style.height = UNDO_CIRCLE_MAX_SIZE + 'px';
+    }
 
     window.addEventListener('resize', onWindowResize, false);
 
@@ -354,7 +363,8 @@ function updateKeyboardNavigation() {
 }
 
 async function setupWebcam() {
-    video = document.getElementById('webcam');
+    const container = window._drawingContainer || document;
+    video = container.querySelector('#webcam') || document.getElementById('webcam');
     video.style.display = 'none'; // Hide the actual video element
 
     try {
@@ -362,17 +372,28 @@ async function setupWebcam() {
             video: { width: 640, height: 480 }
         });
         video.srcObject = stream;
-        video.addEventListener('loadeddata', () => {
-            animate();
+        // Wait for video to be ready
+        await new Promise(resolve => {
+            video.addEventListener('loadeddata', resolve, { once: true });
         });
+        // Hide loading message
+        const loadingEl = container.querySelector('#loading') || document.getElementById('loading');
+        if (loadingEl) loadingEl.style.display = 'none';
     } catch (err) {
         console.error("Error accessing webcam:", err);
-        document.getElementById('loading').innerText = "Error accessing webcam.";
+        const loadingEl = container.querySelector('#loading') || document.getElementById('loading');
+        if (loadingEl) loadingEl.innerText = "Error accessing webcam.";
     }
 }
 
-function animate() {
-    requestAnimationFrame(animate);
+// Track animation frame for cleanup
+let animationFrameId = null;
+let isRunning = false;
+
+// Main animation loop
+function animateLoop() {
+    if (!isRunning) return;
+    animationFrameId = requestAnimationFrame(animateLoop);
 
     // Update keyboard navigation (WASD)
     updateKeyboardNavigation();
@@ -393,7 +414,7 @@ function animate() {
     // Update controllers and labels based on results
     if (results && results.landmarks) {
         // Calculate the physical dimensions of the viewing plane at Z=0
-        const depth = camera.position.z; 
+        const depth = camera.position.z;
         const vFov = camera.fov * Math.PI / 180;
         const heightAtDepth = 2 * Math.tan(vFov / 2) * depth;
         const widthAtDepth = heightAtDepth * camera.aspect;
@@ -405,9 +426,9 @@ function animate() {
             const handedness = results.handednesses[i];
 
             // landmark 8 is the index finger tip
-            const pointer = landmarks[8]; 
+            const pointer = landmarks[8];
             const worldPos = worldLandmarks[8];
-            
+
             let handLabel = handedness[0].categoryName === "Left" ? "Right" : "Left"; // Mirrored for user
             let gestureName = gestures[0].categoryName; // e.g., "Open_Palm", "Closed_Fist"
             let isClosedFist = (gestureName === "Closed_Fist");
@@ -436,16 +457,16 @@ function animate() {
 
             // Map MediaPipe normalized coordinates (0 to 1) to NDC (-1 to 1)
             // Mirror X axis
-            const ndcX = 1 - 2 * pointer.x; 
-            const ndcY = 1 - 2 * pointer.y; 
+            const ndcX = 1 - 2 * pointer.x;
+            const ndcY = 1 - 2 * pointer.y;
 
             // Scale NDC to world coordinates at Z=0 plane
             const worldX = (ndcX * widthAtDepth) / 2;
             const worldY = (ndcY * heightAtDepth) / 2;
             const worldZ = -pointer.z * 5;
-            
+
             const newPos = new THREE.Vector3(worldX, worldY, worldZ);
-            
+
             // Pass the new data into the controller wrapper
             controller.updateState(newPos, null, isClosedFist, isOpenPalm);
             controller.updateTrigger(isPointingUp, isOpenPalm, isClosedFist);
@@ -466,15 +487,15 @@ function animate() {
             // Position label on screen by converting 3D position back to 2D
             const screenPos = controller.position.clone();
             screenPos.project(camera);
-            
+
             const x = (screenPos.x * .5 + .5) * window.innerWidth;
             const y = (screenPos.y * -.5 + .5) * window.innerHeight;
-            
+
             label.container.style.left = `${x}px`;
             label.container.style.top = `${y - 40}px`; // Offset above the sphere
         }
     }
-    
+
     // For hands that are no longer detected, keep grip state unchanged (only open_palm releases)
     for (let i = results?.landmarks?.length || 0; i < MAX_HANDS; i++) {
         controllers[i].updateState(null, null, false, false);
@@ -786,7 +807,85 @@ function animate() {
     renderer.render(scene, camera);
 }
 
-// Initialize everything
-initThreeJS();
-setupMediaPipe();
-setupWebcam();
+// Export functions for external control
+export async function startDrawingMode(container) {
+    if (isRunning) return;
+    isRunning = true;
+
+    // Store reference to container for cleanup
+    window._drawingContainer = container;
+
+    // Show loading indicator
+    const loadingEl = container.querySelector('#loading') || document.getElementById('loading');
+    if (loadingEl) {
+        loadingEl.style.display = 'block';
+        loadingEl.innerText = 'Loading MediaPipe...';
+    }
+
+    // Initialize if not already done
+    if (!renderer) {
+        initThreeJS();
+    }
+
+    // Always move renderer to the container (handles both first run and re-entry)
+    container.appendChild(renderer.domElement);
+
+    // Ensure renderer is sized correctly for fullscreen
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    if (camera) {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+    }
+
+    // Update labelsContainer reference for this container
+    labelsContainer = container.querySelector('#labels-container') || document.getElementById('labels-container');
+
+    // Re-append existing labels to the correct container (for re-entry)
+    if (labels.length > 0 && labelsContainer) {
+        labels.forEach(label => {
+            if (label.container && label.container.parentNode !== labelsContainer) {
+                labelsContainer.appendChild(label.container);
+            }
+        });
+    }
+
+    // Update undo overlay references for this container
+    undoOverlay = container.querySelector('#reset-overlay') || document.getElementById('reset-overlay');
+    undoCircleLeft = container.querySelector('#reset-circle-left') || document.getElementById('reset-circle-left');
+    undoCircleRight = container.querySelector('#reset-circle-right') || document.getElementById('reset-circle-right');
+    if (undoCircleLeft) {
+        undoCircleLeft.style.width = UNDO_CIRCLE_MAX_SIZE + 'px';
+        undoCircleLeft.style.height = UNDO_CIRCLE_MAX_SIZE + 'px';
+    }
+    if (undoCircleRight) {
+        undoCircleRight.style.width = UNDO_CIRCLE_MAX_SIZE + 'px';
+        undoCircleRight.style.height = UNDO_CIRCLE_MAX_SIZE + 'px';
+    }
+
+    await setupMediaPipe();
+    await setupWebcam();
+
+    // Start animation loop
+    animateLoop();
+}
+
+export function stopDrawingMode() {
+    isRunning = false;
+
+    if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
+        animationFrameId = null;
+    }
+
+    // Stop webcam
+    if (video && video.srcObject) {
+        video.srcObject.getTracks().forEach(track => track.stop());
+        video.srcObject = null;
+    }
+
+    // Hide labels
+    labels.forEach(label => {
+        if (label.container) label.container.style.display = 'none';
+    });
+}
+

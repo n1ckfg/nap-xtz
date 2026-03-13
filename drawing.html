@@ -24,7 +24,7 @@
 
     <link rel="stylesheet" href="./css/drawing.css">
 </head>
-<body>
+<body id="drawing-standalone">
     <div id="loading">Loading MediaPipe...</div>
     <video id="webcam" autoplay playsinline></video>
     <!-- Container for HTML labels -->
@@ -34,6 +34,9 @@
         <div id="reset-circle-left"></div>
         <div id="reset-circle-right"></div>
     </div>
-    <script type="module" src="./js/drawing/drawing.js"></script>
+    <script type="module">
+        import { startDrawingMode } from './js/drawing/drawing.js';
+        startDrawingMode(document.body);
+    </script>
 </body>
 </html>
