@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MediaPipe Hand Tracker - Three.js</title>
+    
+    <!-- Three.js library -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+    
+    <!-- Load MediaPipe Tasks as a Module and expose to window -->
+    <script type="module">
+        import { GestureRecognizer, FilesetResolver } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3";
+        window.GestureRecognizer = GestureRecognizer;
+        window.FilesetResolver = FilesetResolver;
+    </script>
+
+    <link rel="stylesheet" href="./css/drawing.css">
+</head>
+<body>
+    <div id="loading">Loading MediaPipe...</div>
+    <video id="webcam" autoplay playsinline></video>
+    <!-- Container for HTML labels -->
+    <div id="labels-container"></div>
+    <!-- Undo/Reset countdown overlay -->
+    <div id="reset-overlay">
+        <div id="reset-circle-left"></div>
+        <div id="reset-circle-right"></div>
+    </div>
+    <script type="module" src="./js/drawing/drawing.js"></script>
+</body>
+</html>

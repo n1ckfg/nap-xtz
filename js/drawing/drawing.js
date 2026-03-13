@@ -1,0 +1,792 @@
+import * as THREE from 'three';
+import { Controller } from './controller.js';
+import { OpenXR_WorldScale } from './worldscale.js';
+import { Frame } from './tools.js';
+import { Palette } from './palette.js';
+
+let gestureRecognizer;
+let video;
+let results;
+let lastVideoTime = -1;
+
+// Three.js variables
+let scene, camera, renderer;
+let pointerMeshes = [];
+let controllers = [];
+let labels = [];
+let labelsContainer;
+
+let worldNode;
+let worldScale;
+let frame;
+
+const MAX_HANDS = 2;
+
+// Palette state per controller
+const PALETTE_HOLD_DURATION = 2000; // 2 seconds to reveal palette
+const PALETTE_FLICKER_DURATION = 300; // 0.3 seconds
+let palettes = [];
+let paletteGripStartTime = []; // When grip started for each controller
+let paletteVisible = []; // Whether palette is visible for each controller
+let paletteSpawnPos = []; // Where palette spawned
+let paletteLines = []; // Line from palette center to controller
+let paletteFlickerStart = []; // When color selection flicker started
+let paletteFlickerIndex = []; // Which color index is flickering
+let controllerDrawColor = []; // Drawing color per controller (hex)
+let controllerColorRims = []; // Rim meshes showing selected color
+
+// Keyboard/Mouse navigation state
+const keysPressed = {};
+const mouseSensitivity = 0.003;
+const panSensitivity = 0.01;
+const zoomSensitivity = 0.001;
+const moveSpeed = 0.1;
+let lastMouseX = 0;
+let lastMouseY = 0;
+let isMouseActive = false;
+
+// Camera spherical coordinates for orbit
+let cameraRadius = 5;
+let cameraTheta = Math.PI / 2; // horizontal angle (start at z-axis)
+let cameraPhi = Math.PI / 2; // vertical angle (horizontal plane)
+let cameraTarget = new THREE.Vector3(0, 0, 0);
+
+// Undo/Reset timer state
+let undoHoldStart = null;
+const UNDO_HOLD_DURATION = 2000; // 2 seconds
+const UNDO_FLICKER_DURATION = 300; // 0.3 seconds
+let undoFlickerStart = null;
+let undoOverlay = null;
+let undoCircleLeft = null;
+let undoCircleRight = null;
+const UNDO_CIRCLE_MAX_SIZE = 400; // pixels
+const UNDO_CIRCLE_MIN_SCALE = 0.1; // 10%
+const UNDO_CIRCLE_SPACING = 0.5; // 50% of circle width apart
+let pendingAction = null; // 'undo' or 'reset'
+
+// Orientation objects fade state
+let orientationObjects = []; // Array of {mesh, material}
+let orientationFadeStart = null;
+const ORIENTATION_FADE_DURATION = 5000; // 5 seconds
+
+async function setupMediaPipe() {
+    // Wait for MediaPipe to be defined on the window
+    while (!window.GestureRecognizer || !window.FilesetResolver) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+    }
+
+    const vision = await window.FilesetResolver.forVisionTasks(
+        "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm"
+    );
+    
+    gestureRecognizer = await window.GestureRecognizer.createFromOptions(vision, {
+        baseOptions: {
+            modelAssetPath: "https://storage.googleapis.com/mediapipe-models/gesture_recognizer/gesture_recognizer/float16/1/gesture_recognizer.task",
+            delegate: "GPU"
+        },
+        runningMode: "VIDEO",
+        numHands: MAX_HANDS
+    });
+    console.log("MediaPipe Loaded");
+    document.getElementById('loading').style.display = 'none';
+}
+
+function initThreeJS() {
+    scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x222222);
+
+    // Set up camera (position set by updateCameraFromSpherical)
+    camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+
+    // Set up renderer
+    renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
+
+    // Add some lighting
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+    scene.add(ambientLight);
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+    directionalLight.position.set(0, 5, 5);
+    scene.add(directionalLight);
+
+    labelsContainer = document.getElementById('labels-container');
+
+    // Create World Node and test cubes
+    worldNode = new THREE.Group();
+    scene.add(worldNode);
+
+    const cubeGeo = new THREE.BoxGeometry(0.5, 0.5, 0.5);
+
+    // Center cube
+    const matCenter = new THREE.MeshPhongMaterial({ color: 0x00ff00, transparent: true });
+    const cubeCenter = new THREE.Mesh(cubeGeo, matCenter);
+    worldNode.add(cubeCenter);
+
+    // Right pyramid (pointing right)
+    const pyramidGeo = new THREE.ConeGeometry(0.3, 0.5, 4);
+    const matRight = new THREE.MeshPhongMaterial({ color: 0xff0000, transparent: true });
+    const pyramidRight = new THREE.Mesh(pyramidGeo, matRight);
+    pyramidRight.position.set(2, 0, 0);
+    pyramidRight.rotation.z = -Math.PI / 2; // Rotate to point right
+    worldNode.add(pyramidRight);
+
+    // Top pyramid (pointing up)
+    const matTop = new THREE.MeshPhongMaterial({ color: 0x0000ff, transparent: true });
+    const pyramidTop = new THREE.Mesh(pyramidGeo, matTop);
+    pyramidTop.position.set(0, 2, 0);
+    worldNode.add(pyramidTop);
+
+    // Store orientation objects for fade effect
+    orientationObjects = [
+        { mesh: cubeCenter, material: matCenter },
+        { mesh: pyramidRight, material: matRight },
+        { mesh: pyramidTop, material: matTop }
+    ];
+    orientationFadeStart = performance.now();
+
+    // Create meshes and controllers for hands
+    const geometry = new THREE.SphereGeometry(0.2, 32, 32);
+    for (let i = 0; i < MAX_HANDS; i++) {
+        const material = new THREE.MeshPhongMaterial({ color: 0xffffff });
+        const mesh = new THREE.Mesh(geometry, material);
+
+        // Create color rim around the sphere
+        const rimGeo = new THREE.RingGeometry(0.22, 0.28, 32);
+        const rimMat = new THREE.MeshBasicMaterial({
+            color: 0xffffff,
+            side: THREE.DoubleSide,
+            depthTest: false
+        });
+        const rim = new THREE.Mesh(rimGeo, rimMat);
+        rim.renderOrder = 998;
+        controllerColorRims.push(rim);
+
+        const controller = new Controller();
+        controller.visible = false; // Hide by default
+        controller.add(mesh); // Attach the visual indicator to the controller
+        controller.add(rim); // Attach the color rim
+
+        scene.add(controller);
+
+        pointerMeshes.push(mesh);
+        controllers.push(controller);
+
+        // Create palette for this controller
+        const palette = new Palette(0.5, 0.08);
+        palette.visible = false;
+        scene.add(palette);
+        palettes.push(palette);
+        paletteGripStartTime.push(null);
+        paletteVisible.push(false);
+        paletteSpawnPos.push(new THREE.Vector3());
+        paletteFlickerStart.push(null);
+        paletteFlickerIndex.push(-1);
+        controllerDrawColor.push(0xffffff); // Default white
+
+        // Create line from palette to controller
+        const lineGeo = new THREE.BufferGeometry().setFromPoints([
+            new THREE.Vector3(), new THREE.Vector3()
+        ]);
+        const lineMat = new THREE.LineBasicMaterial({ color: 0xffffff });
+        const paletteLine = new THREE.Line(lineGeo, lineMat);
+        paletteLine.visible = false;
+        paletteLine.frustumCulled = false;
+        scene.add(paletteLine);
+        paletteLines.push(paletteLine);
+
+        // Create HTML labels for 3D coordinates and gesture text
+        const labelDiv = document.createElement('div');
+        labelDiv.className = 'label';
+        labelDiv.style.display = 'none';
+        
+        const mainText = document.createElement('div');
+        const subText = document.createElement('div');
+        subText.className = 'label-small';
+        
+        labelDiv.appendChild(mainText);
+        labelDiv.appendChild(subText);
+        labelsContainer.appendChild(labelDiv);
+        
+        labels.push({
+            container: labelDiv,
+            main: mainText,
+            sub: subText
+        });
+    }
+
+    // Initialize the world scale logic with our two controllers and the world group
+    worldScale = new OpenXR_WorldScale(controllers[0], controllers[1], worldNode);
+    frame = new Frame(worldNode);
+
+    // Initialize undo/reset overlay
+    undoOverlay = document.getElementById('reset-overlay');
+    undoCircleLeft = document.getElementById('reset-circle-left');
+    undoCircleRight = document.getElementById('reset-circle-right');
+    undoCircleLeft.style.width = UNDO_CIRCLE_MAX_SIZE + 'px';
+    undoCircleLeft.style.height = UNDO_CIRCLE_MAX_SIZE + 'px';
+    undoCircleRight.style.width = UNDO_CIRCLE_MAX_SIZE + 'px';
+    undoCircleRight.style.height = UNDO_CIRCLE_MAX_SIZE + 'px';
+
+    window.addEventListener('resize', onWindowResize, false);
+
+    // Keyboard controls
+    window.addEventListener('keydown', onKeyDown, false);
+    window.addEventListener('keyup', onKeyUp, false);
+
+    // Mouse controls
+    window.addEventListener('mousedown', onMouseDown, false);
+    window.addEventListener('mouseup', onMouseUp, false);
+    window.addEventListener('mousemove', onMouseMove, false);
+    window.addEventListener('wheel', onMouseWheel, false);
+
+    // Initialize camera position from spherical coordinates
+    updateCameraFromSpherical();
+}
+
+function onWindowResize() {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+}
+
+// Keyboard handlers
+function onKeyDown(event) {
+    keysPressed[event.key.toLowerCase()] = true;
+}
+
+function onKeyUp(event) {
+    keysPressed[event.key.toLowerCase()] = false;
+}
+
+// Mouse handlers
+function onMouseDown(event) {
+    if (event.altKey) {
+        isMouseActive = true;
+        lastMouseX = event.clientX;
+        lastMouseY = event.clientY;
+    }
+}
+
+function onMouseUp(event) {
+    isMouseActive = false;
+}
+
+function onMouseMove(event) {
+    if (!isMouseActive || !event.altKey) {
+        isMouseActive = false;
+        return;
+    }
+
+    const deltaX = event.clientX - lastMouseX;
+    const deltaY = event.clientY - lastMouseY;
+    lastMouseX = event.clientX;
+    lastMouseY = event.clientY;
+
+    if (event.shiftKey) {
+        // Alt + Shift + mouse = pan
+        const right = new THREE.Vector3();
+        const up = new THREE.Vector3();
+        camera.getWorldDirection(up);
+        right.crossVectors(up, camera.up).normalize();
+        up.crossVectors(right, camera.getWorldDirection(new THREE.Vector3())).normalize();
+
+        cameraTarget.addScaledVector(right, -deltaX * panSensitivity);
+        cameraTarget.addScaledVector(up, deltaY * panSensitivity);
+    } else {
+        // Alt + mouse = rotate (orbit)
+        cameraTheta += deltaX * mouseSensitivity;
+        cameraPhi -= deltaY * mouseSensitivity;
+
+        // Clamp phi to avoid flipping
+        cameraPhi = Math.max(0.1, Math.min(Math.PI - 0.1, cameraPhi));
+    }
+
+    updateCameraFromSpherical();
+}
+
+function onMouseWheel(event) {
+    // Scroll wheel = zoom
+    cameraRadius += event.deltaY * zoomSensitivity * cameraRadius;
+    cameraRadius = Math.max(0.5, Math.min(50, cameraRadius));
+    updateCameraFromSpherical();
+}
+
+function updateCameraFromSpherical() {
+    // Convert spherical to Cartesian
+    camera.position.x = cameraTarget.x + cameraRadius * Math.sin(cameraPhi) * Math.cos(cameraTheta);
+    camera.position.y = cameraTarget.y + cameraRadius * Math.cos(cameraPhi);
+    camera.position.z = cameraTarget.z + cameraRadius * Math.sin(cameraPhi) * Math.sin(cameraTheta);
+    camera.lookAt(cameraTarget);
+}
+
+function resetCamera() {
+    cameraRadius = 5;
+    cameraTheta = Math.PI / 2;
+    cameraPhi = Math.PI / 2;
+    cameraTarget.set(0, 0, 0);
+    updateCameraFromSpherical();
+}
+
+function updateKeyboardNavigation() {
+    if (!keysPressed['w'] && !keysPressed['a'] && !keysPressed['s'] && !keysPressed['d']) {
+        return;
+    }
+
+    // Get camera forward and right vectors (projected onto XZ plane)
+    const forward = new THREE.Vector3();
+    camera.getWorldDirection(forward);
+    forward.y = 0;
+    forward.normalize();
+
+    const right = new THREE.Vector3();
+    right.crossVectors(forward, camera.up).normalize();
+
+    const movement = new THREE.Vector3();
+
+    if (keysPressed['w']) movement.addScaledVector(forward, moveSpeed);
+    if (keysPressed['s']) movement.addScaledVector(forward, -moveSpeed);
+    if (keysPressed['a']) movement.addScaledVector(right, -moveSpeed);
+    if (keysPressed['d']) movement.addScaledVector(right, moveSpeed);
+
+    cameraTarget.add(movement);
+    updateCameraFromSpherical();
+}
+
+async function setupWebcam() {
+    video = document.getElementById('webcam');
+    video.style.display = 'none'; // Hide the actual video element
+
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+            video: { width: 640, height: 480 }
+        });
+        video.srcObject = stream;
+        video.addEventListener('loadeddata', () => {
+            animate();
+        });
+    } catch (err) {
+        console.error("Error accessing webcam:", err);
+        document.getElementById('loading').innerText = "Error accessing webcam.";
+    }
+}
+
+function animate() {
+    requestAnimationFrame(animate);
+
+    // Update keyboard navigation (WASD)
+    updateKeyboardNavigation();
+
+    // Run MediaPipe Recognition
+    if (gestureRecognizer && video.readyState >= 2) {
+        let nowInMs = Date.now();
+        if (video.currentTime !== lastVideoTime) {
+            results = gestureRecognizer.recognizeForVideo(video, nowInMs);
+            lastVideoTime = video.currentTime;
+        }
+    }
+
+    // Hide all controllers and labels initially
+    controllers.forEach(c => c.visible = false);
+    labels.forEach(label => label.container.style.display = 'none');
+
+    // Update controllers and labels based on results
+    if (results && results.landmarks) {
+        // Calculate the physical dimensions of the viewing plane at Z=0
+        const depth = camera.position.z; 
+        const vFov = camera.fov * Math.PI / 180;
+        const heightAtDepth = 2 * Math.tan(vFov / 2) * depth;
+        const widthAtDepth = heightAtDepth * camera.aspect;
+
+        for (let i = 0; i < results.landmarks.length && i < MAX_HANDS; i++) {
+            const landmarks = results.landmarks[i];
+            const worldLandmarks = results.worldLandmarks[i];
+            const gestures = results.gestures[i];
+            const handedness = results.handednesses[i];
+
+            // landmark 8 is the index finger tip
+            const pointer = landmarks[8]; 
+            const worldPos = worldLandmarks[8];
+            
+            let handLabel = handedness[0].categoryName === "Left" ? "Right" : "Left"; // Mirrored for user
+            let gestureName = gestures[0].categoryName; // e.g., "Open_Palm", "Closed_Fist"
+            let isClosedFist = (gestureName === "Closed_Fist");
+            let isOpenPalm = (gestureName === "Open_Palm");
+            let isPointingUp = (gestureName === "Pointing_Up");
+            let isThumbUp = (gestureName === "Thumb_Up");
+            let isThumbDown = (gestureName === "Thumb_Down");
+            let isVictory = (gestureName === "Victory");
+
+            const controller = controllers[i];
+            const mesh = pointerMeshes[i];
+            const rim = controllerColorRims[i];
+            controller.visible = true;
+
+            // Make rim face the camera
+            rim.lookAt(camera.position);
+
+            // Update Color based on gesture
+            if (isClosedFist) {
+                mesh.material.color.setHex(0xff0000); // Red
+            } else if (gestureName === "Open_Palm") {
+                mesh.material.color.setHex(0x00ff00); // Green
+            } else {
+                mesh.material.color.setHex(0xffffff); // White
+            }
+
+            // Map MediaPipe normalized coordinates (0 to 1) to NDC (-1 to 1)
+            // Mirror X axis
+            const ndcX = 1 - 2 * pointer.x; 
+            const ndcY = 1 - 2 * pointer.y; 
+
+            // Scale NDC to world coordinates at Z=0 plane
+            const worldX = (ndcX * widthAtDepth) / 2;
+            const worldY = (ndcY * heightAtDepth) / 2;
+            const worldZ = -pointer.z * 5;
+            
+            const newPos = new THREE.Vector3(worldX, worldY, worldZ);
+            
+            // Pass the new data into the controller wrapper
+            controller.updateState(newPos, null, isClosedFist, isOpenPalm);
+            controller.updateTrigger(isPointingUp, isOpenPalm, isClosedFist);
+            controller.updateButtonA(isThumbUp);
+            controller.updateButtonB(isThumbDown);
+            controller.updateButtonC(isVictory);
+
+            // Slightly scale mesh based on depth
+            const scale = 1 - (pointer.z * 2);
+            mesh.scale.setScalar(Math.max(0.1, scale));
+
+            // Update HTML Labels
+            const label = labels[i];
+            label.container.style.display = 'block';
+            label.main.innerText = `${handLabel}: ${gestureName}`;
+            label.sub.innerText = `3D World: ${worldPos.x.toFixed(2)}, ${worldPos.y.toFixed(2)}, ${worldPos.z.toFixed(2)}`;
+
+            // Position label on screen by converting 3D position back to 2D
+            const screenPos = controller.position.clone();
+            screenPos.project(camera);
+            
+            const x = (screenPos.x * .5 + .5) * window.innerWidth;
+            const y = (screenPos.y * -.5 + .5) * window.innerHeight;
+            
+            label.container.style.left = `${x}px`;
+            label.container.style.top = `${y - 40}px`; // Offset above the sphere
+        }
+    }
+    
+    // For hands that are no longer detected, keep grip state unchanged (only open_palm releases)
+    for (let i = results?.landmarks?.length || 0; i < MAX_HANDS; i++) {
+        controllers[i].updateState(null, null, false, false);
+        controllers[i].updateTrigger(false, false, false);
+        controllers[i].updateButtonA(false);
+        controllers[i].updateButtonB(false);
+        controllers[i].updateButtonC(false);
+    }
+
+    // Drawing logic - each controller can draw independently
+    // Uses drawing position (50% smoothing - more responsive)
+    for (let i = 0; i < MAX_HANDS; i++) {
+        const controller = controllers[i];
+
+        // Start new stroke on trigger_Down
+        if (controller.trigger_Down) {
+            const pos = new THREE.Vector3();
+            controller.getDrawPosition(pos);
+            frame.beginStroke(pos, i, controllerDrawColor[i]);
+        }
+        // Continue stroke while trigger_Held
+        else if (controller.trigger_Held && frame.hasActiveStroke(i)) {
+            const pos = new THREE.Vector3();
+            controller.getDrawPosition(pos);
+            frame.continueStroke(pos, i);
+        }
+        // End stroke on trigger_Up
+        else if (controller.trigger_Up) {
+            frame.endStroke(i);
+        }
+    }
+
+    // Palette logic for each controller
+    const now = performance.now();
+    for (let i = 0; i < MAX_HANDS; i++) {
+        const controller = controllers[i];
+        const palette = palettes[i];
+        const paletteLine = paletteLines[i];
+
+        // Handle flicker phase (color selected)
+        if (paletteFlickerStart[i] !== null) {
+            const flickerElapsed = now - paletteFlickerStart[i];
+            if (flickerElapsed < PALETTE_FLICKER_DURATION) {
+                // Flicker the selected swatch
+                const flickerOn = Math.floor(flickerElapsed / 50) % 2 === 0;
+                const selectedSwatch = palette.swatches[paletteFlickerIndex[i]];
+                if (selectedSwatch) {
+                    selectedSwatch.visible = flickerOn;
+                }
+            } else {
+                // Flicker done - set the color and hide palette
+                const newColor = palette.colors[paletteFlickerIndex[i]].hex;
+                controllerDrawColor[i] = newColor;
+                controllerColorRims[i].material.color.setHex(newColor);
+                palette.visible = false;
+                paletteLine.visible = false;
+                paletteVisible[i] = false;
+                paletteFlickerStart[i] = null;
+                paletteFlickerIndex[i] = -1;
+                paletteGripStartTime[i] = null;
+                // Restore all swatch visibility
+                for (const swatch of palette.swatches) {
+                    swatch.visible = true;
+                }
+            }
+            continue;
+        }
+
+        // Check grip state
+        if (controller.grip_Held && controller.visible) {
+            // Start tracking grip time if not already
+            if (paletteGripStartTime[i] === null) {
+                paletteGripStartTime[i] = now;
+            }
+
+            const gripElapsed = now - paletteGripStartTime[i];
+
+            // After 2 seconds, show palette
+            if (gripElapsed >= PALETTE_HOLD_DURATION && !paletteVisible[i]) {
+                // Only show palette if it's a single grip (not both controllers)
+                const otherGrip = controllers[(i + 1) % MAX_HANDS].grip_Held;
+                if (!otherGrip) {
+                    paletteVisible[i] = true;
+                    palette.visible = true;
+                    paletteLine.visible = true;
+
+                    // Spawn at controller's current position
+                    const pos = new THREE.Vector3();
+                    controller.getWorldPosition(pos);
+                    paletteSpawnPos[i].copy(pos);
+                    palette.position.copy(pos);
+
+                    // Face the camera
+                    palette.lookAt(camera.position);
+                }
+            }
+
+            // Update palette line and check for color hits
+            if (paletteVisible[i]) {
+                const controllerPos = new THREE.Vector3();
+                controller.getWorldPosition(controllerPos);
+
+                // Update line from palette center to controller
+                const positions = paletteLine.geometry.attributes.position.array;
+                positions[0] = paletteSpawnPos[i].x;
+                positions[1] = paletteSpawnPos[i].y;
+                positions[2] = paletteSpawnPos[i].z;
+                positions[3] = controllerPos.x;
+                positions[4] = controllerPos.y;
+                positions[5] = controllerPos.z;
+                paletteLine.geometry.attributes.position.needsUpdate = true;
+
+                // Check if controller touches a color
+                if (palette.hitTest(controllerPos, 0.05)) {
+                    // Hide other swatches, start flicker
+                    const selectedIdx = palette.selectedIndex;
+                    for (let j = 0; j < palette.swatches.length; j++) {
+                        palette.swatches[j].visible = (j === selectedIdx);
+                    }
+                    palette.selectionRing.visible = false;
+                    paletteLine.visible = false;
+                    paletteFlickerStart[i] = now;
+                    paletteFlickerIndex[i] = selectedIdx;
+                }
+            }
+        } else {
+            // Grip released - hide palette
+            if (paletteVisible[i] && paletteFlickerStart[i] === null) {
+                palette.visible = false;
+                paletteLine.visible = false;
+                paletteVisible[i] = false;
+                // Restore all swatch visibility
+                for (const swatch of palette.swatches) {
+                    swatch.visible = true;
+                }
+                palette.selectionRing.visible = true;
+            }
+            paletteGripStartTime[i] = null;
+        }
+    }
+
+    // Double buttonC (Victory gesture) = instant full reset (buttons, camera, world)
+    const bothButtonC = controllers.every(c => c.buttonC_Held);
+    if (bothButtonC) {
+        // Reset all button states on both controllers
+        for (const controller of controllers) {
+            controller.grip_Down = false;
+            controller.grip_Held = false;
+            controller.trigger_Down = false;
+            controller.trigger_Held = false;
+            controller.trigger_Up = false;
+            controller.buttonA_Down = false;
+            controller.buttonA_Held = false;
+            controller.buttonB_Down = false;
+            controller.buttonB_Held = false;
+            controller.buttonC_Down = false;
+            controller.buttonC_Held = false;
+        }
+        // Reset camera
+        resetCamera();
+        // Reset world origin
+        worldNode.position.set(0, 0, 0);
+        worldNode.quaternion.identity();
+        worldNode.scale.set(1, 1, 1);
+        // Reset undo/reset timer state
+        undoHoldStart = null;
+        undoFlickerStart = null;
+        pendingAction = null;
+        undoOverlay.style.display = 'none';
+        undoCircleLeft.style.display = 'none';
+        undoCircleRight.style.display = 'none';
+        // Reset orientation objects fade
+        orientationFadeStart = now;
+        for (const obj of orientationObjects) {
+            obj.material.opacity = 1;
+        }
+    }
+
+    // Undo/Reset logic with hold timer and shrinking circle
+    const buttonBCount = controllers.filter(c => c.buttonB_Held).length;
+    const bothButtonBHeld = buttonBCount === 2;
+    const singleButtonBHeld = buttonBCount === 1;
+
+    // Helper to position circles based on action type
+    const updateCirclePositions = (scale, isReset) => {
+        const offset = isReset ? (UNDO_CIRCLE_MAX_SIZE * UNDO_CIRCLE_SPACING) / 2 : 0;
+        // Center the circles vertically and position horizontally
+        const baseTransform = `translate(-50%, -50%) scale(${scale})`;
+        if (isReset) {
+            // Two circles side by side
+            undoCircleLeft.style.transform = `translate(calc(-50% - ${offset}px), -50%) scale(${scale})`;
+            undoCircleRight.style.transform = `translate(calc(-50% + ${offset}px), -50%) scale(${scale})`;
+            undoCircleLeft.style.display = 'block';
+            undoCircleRight.style.display = 'block';
+        } else {
+            // Single centered circle (use left circle only)
+            undoCircleLeft.style.transform = baseTransform;
+            undoCircleLeft.style.display = 'block';
+            undoCircleRight.style.display = 'none';
+        }
+    };
+
+    // Handle flicker phase
+    if (undoFlickerStart !== null) {
+        const flickerElapsed = now - undoFlickerStart;
+        if (flickerElapsed < UNDO_FLICKER_DURATION) {
+            // Flicker on/off every 50ms
+            const flickerOn = Math.floor(flickerElapsed / 50) % 2 === 0;
+            undoOverlay.style.display = flickerOn ? 'block' : 'none';
+            if (flickerOn) {
+                updateCirclePositions(UNDO_CIRCLE_MIN_SCALE, pendingAction === 'reset');
+            }
+        } else {
+            // Flicker done - action already performed by Frame flicker methods
+            const wasReset = pendingAction === 'reset';
+            undoOverlay.style.display = 'none';
+            undoCircleLeft.style.display = 'none';
+            undoCircleRight.style.display = 'none';
+            undoFlickerStart = null;
+            undoHoldStart = null;
+            pendingAction = null;
+            // Reset all button states on both controllers
+            for (const controller of controllers) {
+                controller.grip_Down = false;
+                controller.grip_Held = false;
+                controller.trigger_Down = false;
+                controller.trigger_Held = false;
+                controller.trigger_Up = false;
+                controller.buttonA_Down = false;
+                controller.buttonA_Held = false;
+                controller.buttonB_Down = false;
+                controller.buttonB_Held = false;
+                controller.buttonC_Down = false;
+                controller.buttonC_Held = false;
+            }
+            // Reset orientation objects fade if this was a full reset
+            if (wasReset) {
+                orientationFadeStart = now;
+                for (const obj of orientationObjects) {
+                    obj.material.opacity = 1;
+                }
+            }
+        }
+    }
+    // Handle hold countdown phase
+    else if (bothButtonBHeld || singleButtonBHeld) {
+        // Determine action: both = reset, single = undo
+        // If it switches from single to both during hold, upgrade to reset
+        const currentAction = bothButtonBHeld ? 'reset' : 'undo';
+
+        if (undoHoldStart === null) {
+            undoHoldStart = now;
+            pendingAction = currentAction;
+        } else if (currentAction === 'reset') {
+            // Upgrade to reset if both are now held
+            pendingAction = 'reset';
+        }
+
+        const holdElapsed = now - undoHoldStart;
+        const progress = Math.min(holdElapsed / UNDO_HOLD_DURATION, 1);
+
+        // Show and shrink circle(s)
+        undoOverlay.style.display = 'block';
+        const scale = 1 - progress * (1 - UNDO_CIRCLE_MIN_SCALE);
+        updateCirclePositions(scale, pendingAction === 'reset');
+
+        // Timer complete - start flicker for both circle and strokes
+        if (progress >= 1) {
+            undoFlickerStart = now;
+            // Start stroke/frame flicker in parallel with circle flicker
+            if (pendingAction === 'reset') {
+                frame.clearWithFlicker();
+                resetCamera();
+            } else if (pendingAction === 'undo') {
+                frame.undoWithFlicker();
+            }
+        }
+    } else {
+        // Button released - cancel action
+        if (undoFlickerStart === null) {
+            undoHoldStart = null;
+            pendingAction = null;
+            undoOverlay.style.display = 'none';
+            undoCircleLeft.style.display = 'none';
+            undoCircleRight.style.display = 'none';
+        }
+    }
+
+    // Update world scale logic
+    if (worldScale) {
+        worldScale.update();
+    }
+
+    // Update orientation objects fade
+    if (orientationFadeStart !== null) {
+        const fadeElapsed = now - orientationFadeStart;
+        const fadeProgress = Math.min(fadeElapsed / ORIENTATION_FADE_DURATION, 1);
+        const opacity = 1 - fadeProgress;
+
+        for (const obj of orientationObjects) {
+            obj.material.opacity = opacity;
+        }
+
+        if (fadeProgress >= 1) {
+            orientationFadeStart = null;
+        }
+    }
+
+    renderer.render(scene, camera);
+}
+
+// Initialize everything
+initThreeJS();
+setupMediaPipe();
+setupWebcam();
