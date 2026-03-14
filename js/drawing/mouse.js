@@ -38,10 +38,16 @@ export class MouseController extends THREE.Object3D {
         // Drawing plane (at z=0 by default)
         this._drawPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
 
+        // Visibility timeout
+        this._hideTimeout = null;
+        this._hideDelay = 5000; // 5 seconds
+        this._cursorHidden = true; // Start hidden
+
         // Visual indicator
         const geometry = new THREE.SphereGeometry(0.15, 16, 16);
         const material = new THREE.MeshBasicMaterial({ color: 0xffff00 });
         this._cursor = new THREE.Mesh(geometry, material);
+        this._cursor.visible = false; // Start hidden
         this.add(this._cursor);
 
         // Color rim around cursor
@@ -53,6 +59,7 @@ export class MouseController extends THREE.Object3D {
         });
         this._colorRim = new THREE.Mesh(rimGeo, rimMat);
         this._colorRim.renderOrder = 998;
+        this._colorRim.visible = false; // Start hidden
         this.add(this._colorRim);
 
         // Bind event handlers
@@ -66,6 +73,8 @@ export class MouseController extends THREE.Object3D {
      * Start listening for mouse events
      */
     enable() {
+        // Start with cursor hidden
+        this.hide();
         window.addEventListener('mousemove', this._onMouseMove);
         window.addEventListener('mousedown', this._onMouseDown);
         window.addEventListener('mouseup', this._onMouseUp);
@@ -80,6 +89,8 @@ export class MouseController extends THREE.Object3D {
         window.removeEventListener('mousedown', this._onMouseDown);
         window.removeEventListener('mouseup', this._onMouseUp);
         window.removeEventListener('contextmenu', this._onContextMenu);
+        this._clearHideTimeout();
+        this.hide();
     }
 
     _onMouseMove(event) {
@@ -89,6 +100,12 @@ export class MouseController extends THREE.Object3D {
         // Convert to NDC (-1 to 1)
         this._mouseNDC.x = (event.clientX / window.innerWidth) * 2 - 1;
         this._mouseNDC.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+        // Show cursor on mouse move
+        this.show();
+
+        // Reset hide timeout
+        this._resetHideTimeout();
     }
 
     _onMouseDown(event) {
@@ -227,5 +244,48 @@ export class MouseController extends THREE.Object3D {
     setCursorVisible(visible) {
         this._cursor.visible = visible;
         this._colorRim.visible = visible;
+    }
+
+    /**
+     * Show the cursor and start hide timeout
+     */
+    show() {
+        if (this._cursorHidden) {
+            this._cursor.visible = true;
+            this._colorRim.visible = true;
+            this._cursorHidden = false;
+        }
+    }
+
+    /**
+     * Hide the cursor
+     */
+    hide() {
+        this._cursor.visible = false;
+        this._colorRim.visible = false;
+        this._cursorHidden = true;
+        this._clearHideTimeout();
+    }
+
+    /**
+     * Reset the auto-hide timeout
+     * @private
+     */
+    _resetHideTimeout() {
+        this._clearHideTimeout();
+        this._hideTimeout = setTimeout(() => {
+            this.hide();
+        }, this._hideDelay);
+    }
+
+    /**
+     * Clear the hide timeout
+     * @private
+     */
+    _clearHideTimeout() {
+        if (this._hideTimeout) {
+            clearTimeout(this._hideTimeout);
+            this._hideTimeout = null;
+        }
     }
 }
