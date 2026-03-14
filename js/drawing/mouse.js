@@ -35,23 +35,24 @@ export class MouseController extends THREE.Object3D {
         this._raycaster = new THREE.Raycaster();
         this._mouseNDC = new THREE.Vector2();
 
-        // Drawing plane (at z=0 by default)
+        // Drawing plane - fixed distance from camera
         this._drawPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
+        this._drawDistance = 5; // Fixed distance from camera
 
         // Visibility timeout
         this._hideTimeout = null;
         this._hideDelay = 5000; // 5 seconds
         this._cursorHidden = true; // Start hidden
 
-        // Visual indicator
-        const geometry = new THREE.SphereGeometry(0.15, 16, 16);
+        // Visual indicator (50% smaller)
+        const geometry = new THREE.SphereGeometry(0.075, 16, 16);
         const material = new THREE.MeshBasicMaterial({ color: 0xffff00 });
         this._cursor = new THREE.Mesh(geometry, material);
         this._cursor.visible = false; // Start hidden
         this.add(this._cursor);
 
-        // Color rim around cursor
-        const rimGeo = new THREE.RingGeometry(0.17, 0.22, 32);
+        // Color rim around cursor (50% smaller)
+        const rimGeo = new THREE.RingGeometry(0.085, 0.11, 32);
         const rimMat = new THREE.MeshBasicMaterial({
             color: 0xffffff,
             side: THREE.DoubleSide,
@@ -143,6 +144,11 @@ export class MouseController extends THREE.Object3D {
      * @param {THREE.Camera} camera - The scene camera
      */
     update(camera) {
+        // Update draw plane to be at fixed distance from camera, facing camera
+        const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+        const planeCenter = camera.position.clone().addScaledVector(forward, this._drawDistance);
+        this._drawPlane.setFromNormalAndCoplanarPoint(forward.clone().negate(), planeCenter);
+
         // Project mouse ray onto draw plane
         this._raycaster.setFromCamera(this._mouseNDC, camera);
 
@@ -220,12 +226,9 @@ export class MouseController extends THREE.Object3D {
     /**
      * Set the draw plane distance from camera
      * @param {number} distance - Distance along camera's forward direction
-     * @param {THREE.Camera} camera - The scene camera
      */
-    setDrawPlaneDistance(distance, camera) {
-        const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
-        const planePoint = camera.position.clone().addScaledVector(forward, distance);
-        this._drawPlane.setFromNormalAndCoplanarPoint(forward.negate(), planePoint);
+    setDrawPlaneDistance(distance) {
+        this._drawDistance = distance;
     }
 
     /**

@@ -14,7 +14,7 @@ export class Stroke {
         this.color = color;
         this.smoothReps = 10;
         this.splitReps = 2;
-        this.thickness = 0.5; // Brush thickness
+        this.thickness = 0.25; // Brush thickness
         this.pressures = [];   // Pressure values per point (0-1)
         this.taperPower = 0.4; // Taper exponent for ends
         this.minThickness = 0.3; // Minimum thickness multiplier

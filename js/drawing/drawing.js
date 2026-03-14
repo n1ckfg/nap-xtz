@@ -243,7 +243,7 @@ function initThreeJS() {
 
     // Initialize mouse controller
     mouseController = new MouseController();
-    mouseController.setDrawPlaneDistance(5, camera); // Draw at camera target distance
+    mouseController.setDrawPlaneDistance(5); // Fixed distance from camera
     scene.add(mouseController);
 
     // Create palette for mouse controller
