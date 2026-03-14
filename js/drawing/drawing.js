@@ -1176,9 +1176,9 @@ function convertToNAPLPS() {
 
             // Convert NDC to normalized 0-1 coordinates
             // NDC: x=-1 is left, x=1 is right; y=-1 is bottom, y=1 is top
-            // NAPLPS: x=0 is left, x=1 is right; y=0 is bottom, y=1 is top
+            // NAPLPS: x=0 is left, x=1 is right; y=0 is top, y=1 is bottom
             const nx = (projected.x + 1) / 2;
-            const ny = (projected.y + 1) / 2;
+            const ny = (1 - projected.y) / 2; // Flip Y axis
 
             // Clamp to valid range
             const clampedX = Math.max(0, Math.min(1, nx));
