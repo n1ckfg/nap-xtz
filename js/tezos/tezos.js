@@ -86,7 +86,15 @@ async function initTezos() {
         const networkType = (SDK.NetworkType && SDK.NetworkType.GHOSTNET) || "ghostnet";
         _beaconClient = new SDK.DAppClient({
             name: "NAP-XTZ",
-            network: { type: networkType }
+            network: { type: networkType },
+            // Disable deprecated P2P matrix relay (papers.tech servers are offline).
+            enableMetrics: false,
+            featuresConfig: {
+                network: {
+                    // Skip P2P pairing entirely - use only WalletConnect/extensions.
+                    enableP2P: false
+                }
+            }
         });
 
         // Beacon SDK v4+ requires an explicit subscriber for ACTIVE_ACCOUNT_SET
