@@ -548,6 +548,7 @@
 			import { startDrawingMode, stopDrawingMode } from './js/drawing/drawing.js';
 
 			document.getElementById('btn-live-drawing').addEventListener('click', async () => {
+				telidon = [];
 				const container = document.getElementById('drawing-container');
 				container.classList.add('active');
 				await startDrawingMode(container);
