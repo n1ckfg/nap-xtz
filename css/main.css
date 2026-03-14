@@ -209,6 +209,26 @@ a:hover {
 	left: 50%;
 }
 
+#drawing-container #confirm-overlay {
+	position: fixed;
+	top: 50%;
+	left: 50%;
+	transform: translate(-50%, -50%);
+	pointer-events: none;
+	z-index: 100;
+	display: none;
+}
+
+#drawing-container #confirm-circle-left,
+#drawing-container #confirm-circle-right {
+	position: absolute;
+	border: 8px solid rgba(0, 255, 0, 0.5);
+	border-radius: 50%;
+	box-sizing: border-box;
+	top: 50%;
+	left: 50%;
+}
+
 #btn-exit-drawing {
 	position: fixed;
 	top: 20px;

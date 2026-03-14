@@ -23,7 +23,7 @@ let frame;
 const MAX_HANDS = 2;
 
 // Palette state per controller
-const PALETTE_HOLD_DURATION = 2000; // 2 seconds to reveal palette
+const PALETTE_HOLD_DURATION = 1600; // 1.6 seconds to reveal palette
 const PALETTE_FLICKER_DURATION = 300; // 0.3 seconds
 let palettes = [];
 let paletteGripStartTime = []; // When grip started for each controller
@@ -63,6 +63,15 @@ const UNDO_CIRCLE_MAX_SIZE = 400; // pixels
 const UNDO_CIRCLE_MIN_SCALE = 0.1; // 10%
 const UNDO_CIRCLE_SPACING = 0.5; // 50% of circle width apart
 let pendingAction = null; // 'undo' or 'reset'
+
+// Confirm (green expanding) circle state
+let confirmOverlay = null;
+let confirmCircleLeft = null;
+let confirmCircleRight = null;
+let confirmHoldStart = null;
+let confirmFlickerStart = null;
+let confirmIsDouble = false; // single or double circle
+let pendingConfirmAction = null; // 'single' or 'double'
 
 // Orientation objects fade state
 let orientationObjects = []; // Array of {mesh, material}
@@ -178,7 +187,7 @@ function initThreeJS() {
         controllers.push(controller);
 
         // Create palette for this controller
-        const palette = new Palette(0.5, 0.08);
+        const palette = new Palette(0.6, 0.08);
         palette.visible = false;
         scene.add(palette);
         palettes.push(palette);
@@ -235,6 +244,19 @@ function initThreeJS() {
     if (undoCircleRight) {
         undoCircleRight.style.width = UNDO_CIRCLE_MAX_SIZE + 'px';
         undoCircleRight.style.height = UNDO_CIRCLE_MAX_SIZE + 'px';
+    }
+
+    // Initialize confirm (green) overlay
+    confirmOverlay = container.querySelector('#confirm-overlay') || document.getElementById('confirm-overlay');
+    confirmCircleLeft = container.querySelector('#confirm-circle-left') || document.getElementById('confirm-circle-left');
+    confirmCircleRight = container.querySelector('#confirm-circle-right') || document.getElementById('confirm-circle-right');
+    if (confirmCircleLeft) {
+        confirmCircleLeft.style.width = UNDO_CIRCLE_MAX_SIZE + 'px';
+        confirmCircleLeft.style.height = UNDO_CIRCLE_MAX_SIZE + 'px';
+    }
+    if (confirmCircleRight) {
+        confirmCircleRight.style.width = UNDO_CIRCLE_MAX_SIZE + 'px';
+        confirmCircleRight.style.height = UNDO_CIRCLE_MAX_SIZE + 'px';
     }
 
     window.addEventListener('resize', onWindowResize, false);
@@ -308,7 +330,7 @@ function onMouseMove(event) {
         cameraPhi -= deltaY * mouseSensitivity;
 
         // Clamp theta to 180-degree hemisphere (front-facing, 0 to PI)
-        cameraTheta = Math.max(0, Math.min(Math.PI, cameraTheta));
+        //cameraTheta = Math.max(0, Math.min(Math.PI, cameraTheta));
 
         // Clamp phi to avoid flipping
         cameraPhi = Math.max(0.1, Math.min(Math.PI - 0.1, cameraPhi));
@@ -551,8 +573,11 @@ function animateLoop() {
             } else {
                 // Flicker done - set the color and hide palette
                 const newColor = palette.colors[paletteFlickerIndex[i]].hex;
-                controllerDrawColor[i] = newColor;
-                controllerColorRims[i].material.color.setHex(newColor);
+                // Update color for ALL controllers (shared color)
+                for (let j = 0; j < MAX_HANDS; j++) {
+                    controllerDrawColor[j] = newColor;
+                    controllerColorRims[j].material.color.setHex(newColor);
+                }
                 palette.visible = false;
                 paletteLine.visible = false;
                 paletteVisible[i] = false;
@@ -787,6 +812,97 @@ function animateLoop() {
         }
     }
 
+    // Confirm logic (Button A) - green expanding circles with hold timer
+    const buttonACount = controllers.filter(c => c.buttonA_Held).length;
+    const bothButtonAHeld = buttonACount === 2;
+    const singleButtonAHeld = buttonACount === 1;
+
+    // Helper to position confirm circles based on action type
+    const updateConfirmCirclePositions = (scale, isDouble) => {
+        const offset = isDouble ? (UNDO_CIRCLE_MAX_SIZE * UNDO_CIRCLE_SPACING) / 2 : 0;
+        const baseTransform = `translate(-50%, -50%) scale(${scale})`;
+        if (isDouble) {
+            // Two circles side by side
+            if (confirmCircleLeft) {
+                confirmCircleLeft.style.transform = `translate(calc(-50% - ${offset}px), -50%) scale(${scale})`;
+                confirmCircleLeft.style.display = 'block';
+            }
+            if (confirmCircleRight) {
+                confirmCircleRight.style.transform = `translate(calc(-50% + ${offset}px), -50%) scale(${scale})`;
+                confirmCircleRight.style.display = 'block';
+            }
+        } else {
+            // Single centered circle
+            if (confirmCircleLeft) {
+                confirmCircleLeft.style.transform = baseTransform;
+                confirmCircleLeft.style.display = 'block';
+            }
+            if (confirmCircleRight) {
+                confirmCircleRight.style.display = 'none';
+            }
+        }
+    };
+
+    // Handle confirm flicker phase
+    if (confirmFlickerStart !== null) {
+        const flickerElapsed = now - confirmFlickerStart;
+        if (flickerElapsed < UNDO_FLICKER_DURATION) {
+            // Flicker on/off every 50ms
+            const flickerOn = Math.floor(flickerElapsed / 50) % 2 === 0;
+            if (confirmOverlay) confirmOverlay.style.display = flickerOn ? 'block' : 'none';
+            if (flickerOn) {
+                updateConfirmCirclePositions(1, pendingConfirmAction === 'double');
+            }
+        } else {
+            // Flicker done
+            if (confirmOverlay) confirmOverlay.style.display = 'none';
+            if (confirmCircleLeft) confirmCircleLeft.style.display = 'none';
+            if (confirmCircleRight) confirmCircleRight.style.display = 'none';
+            confirmFlickerStart = null;
+            confirmHoldStart = null;
+            pendingConfirmAction = null;
+            // Reset button states
+            for (const controller of controllers) {
+                controller.buttonA_Down = false;
+                controller.buttonA_Held = false;
+            }
+        }
+    }
+    // Handle confirm hold countdown phase (expanding circles)
+    else if (bothButtonAHeld || singleButtonAHeld) {
+        const currentAction = bothButtonAHeld ? 'double' : 'single';
+
+        if (confirmHoldStart === null) {
+            confirmHoldStart = now;
+            pendingConfirmAction = currentAction;
+        } else if (currentAction === 'double') {
+            // Upgrade to double if both are now held
+            pendingConfirmAction = 'double';
+        }
+
+        const holdElapsed = now - confirmHoldStart;
+        const progress = Math.min(holdElapsed / UNDO_HOLD_DURATION, 1);
+
+        // Show and expand circle(s) (reverse of shrink)
+        if (confirmOverlay) confirmOverlay.style.display = 'block';
+        const scale = UNDO_CIRCLE_MIN_SCALE + progress * (1 - UNDO_CIRCLE_MIN_SCALE);
+        updateConfirmCirclePositions(scale, pendingConfirmAction === 'double');
+
+        // Timer complete - start flicker
+        if (progress >= 1) {
+            confirmFlickerStart = now;
+        }
+    } else {
+        // Button released - cancel action
+        if (confirmFlickerStart === null) {
+            confirmHoldStart = null;
+            pendingConfirmAction = null;
+            if (confirmOverlay) confirmOverlay.style.display = 'none';
+            if (confirmCircleLeft) confirmCircleLeft.style.display = 'none';
+            if (confirmCircleRight) confirmCircleRight.style.display = 'none';
+        }
+    }
+
     // Update world scale logic
     if (worldScale) {
         worldScale.update();
@@ -863,6 +979,19 @@ export async function startDrawingMode(container) {
     if (undoCircleRight) {
         undoCircleRight.style.width = UNDO_CIRCLE_MAX_SIZE + 'px';
         undoCircleRight.style.height = UNDO_CIRCLE_MAX_SIZE + 'px';
+    }
+
+    // Update confirm overlay references for this container
+    confirmOverlay = container.querySelector('#confirm-overlay') || document.getElementById('confirm-overlay');
+    confirmCircleLeft = container.querySelector('#confirm-circle-left') || document.getElementById('confirm-circle-left');
+    confirmCircleRight = container.querySelector('#confirm-circle-right') || document.getElementById('confirm-circle-right');
+    if (confirmCircleLeft) {
+        confirmCircleLeft.style.width = UNDO_CIRCLE_MAX_SIZE + 'px';
+        confirmCircleLeft.style.height = UNDO_CIRCLE_MAX_SIZE + 'px';
+    }
+    if (confirmCircleRight) {
+        confirmCircleRight.style.width = UNDO_CIRCLE_MAX_SIZE + 'px';
+        confirmCircleRight.style.height = UNDO_CIRCLE_MAX_SIZE + 'px';
     }
 
     await setupMediaPipe();

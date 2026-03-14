@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 
 // Number of points to trim from start and end of each stroke
-const pointsTrim = 5;
+const pointsTrimStart = 1;
+const pointsTrimEnd = 5;
 
 // Flicker duration and interval for undo/clear animations
 const FLICKER_DURATION = 300; // ms
@@ -13,6 +14,10 @@ export class Stroke {
         this.color = color;
         this.smoothReps = 10;
         this.splitReps = 2;
+        this.thickness = 0.5; // Brush thickness
+        this.pressures = [];   // Pressure values per point (0-1)
+        this.taperPower = 0.4; // Taper exponent for ends
+        this.minThickness = 0.3; // Minimum thickness multiplier
     }
 
     /**
@@ -176,6 +181,127 @@ export class Stroke {
             point.addScaledVector(normal, amount);
         }
     }
+
+    /**
+     * Computes pressure values for each point based on position in stroke
+     * Tapers at both ends using a sine-based falloff
+     */
+    computePressures() {
+        this.pressures = [];
+        const n = this.points.length;
+        if (n === 0) return;
+
+        for (let i = 0; i < n; i++) {
+            // Sine-based pressure: peaks in middle, tapers at ends
+            const t = i / Math.max(1, n - 1) * Math.PI;
+            const pressure = Math.sqrt((1.0 - Math.cos(t)) * 0.5);
+            this.pressures.push(pressure);
+        }
+    }
+
+    /**
+     * Creates brush stroke geometry using quads perpendicular to stroke direction
+     * Based on Yellowtail's compile() method by Golan Levin
+     * @returns {THREE.BufferGeometry} The brush geometry
+     */
+    toBrushGeometry() {
+        if (this.points.length < 2) return null;
+
+        // Compute pressures if not already set
+        if (this.pressures.length !== this.points.length) {
+            this.computePressures();
+        }
+
+        const normal = this.computeNormal();
+        const vertices = [];
+        const indices = [];
+
+        const nPoints = this.points.length;
+        const lastIndex = nPoints - 1;
+
+        // Arrays to store left and right edge points
+        const leftEdge = [];
+        const rightEdge = [];
+
+        for (let i = 0; i < nPoints; i++) {
+            const p = this.points[i];
+
+            // First and last points: fixed small radius to avoid flare
+            let radius;
+            if (i === 0 || i === lastIndex) {
+                radius = 0.01;
+            } else {
+                // Calculate taper based on position (taper at end)
+                const taper = Math.pow((lastIndex - i) / Math.max(1, lastIndex), this.taperPower);
+
+                // Calculate radius at this point
+                const pressure = this.pressures[i] || 1.0;
+                radius = Math.max(
+                    this.minThickness * this.thickness,
+                    taper * pressure * this.thickness
+                );
+            }
+
+            // Calculate tangent direction
+            let tangent = new THREE.Vector3();
+            if (i === 0) {
+                // First point: direction to next
+                tangent.subVectors(this.points[1], p);
+            } else if (i === lastIndex) {
+                // Last point: direction from previous
+                tangent.subVectors(p, this.points[i - 1]);
+            } else {
+                // Middle points: average direction (prev to next)
+                tangent.subVectors(this.points[i + 1], this.points[i - 1]);
+            }
+
+            const tangentLength = tangent.length();
+            if (tangentLength < 0.0001) {
+                tangent.set(1, 0, 0);
+            } else {
+                tangent.divideScalar(tangentLength);
+            }
+
+            // Calculate perpendicular in the stroke plane
+            const perp = new THREE.Vector3().crossVectors(tangent, normal).normalize();
+
+            // Create left and right edge points
+            const left = p.clone().addScaledVector(perp, radius);
+            const right = p.clone().addScaledVector(perp, -radius);
+
+            leftEdge.push(left);
+            rightEdge.push(right);
+        }
+
+        // Build vertices array (left edge then right edge)
+        for (let i = 0; i < nPoints; i++) {
+            vertices.push(leftEdge[i].x, leftEdge[i].y, leftEdge[i].z);
+        }
+        for (let i = 0; i < nPoints; i++) {
+            vertices.push(rightEdge[i].x, rightEdge[i].y, rightEdge[i].z);
+        }
+
+        // Build quad indices (two triangles per quad)
+        for (let i = 0; i < nPoints - 1; i++) {
+            const l0 = i;               // left edge, current
+            const l1 = i + 1;           // left edge, next
+            const r0 = nPoints + i;     // right edge, current
+            const r1 = nPoints + i + 1; // right edge, next
+
+            // Triangle 1: l0, r0, l1
+            indices.push(l0, r0, l1);
+            // Triangle 2: l1, r0, r1
+            indices.push(l1, r0, r1);
+        }
+
+        // Create geometry
+        const geometry = new THREE.BufferGeometry();
+        geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+        geometry.setIndex(indices);
+        geometry.computeVertexNormals();
+
+        return geometry;
+    }
 }
 
 export class Frame extends THREE.Group {
@@ -262,10 +388,10 @@ export class Frame extends THREE.Group {
         const localPoint = this.worldToLocal(worldPosition.clone());
         rawPoints.push(localPoint);
 
-        // Add point that is pointsTrim behind current, skipping first pointsTrim
-        // This trims pointsTrim from start and pointsTrim from end (end points stay in buffer)
-        const addIndex = rawPoints.length - 1 - pointsTrim;
-        if (addIndex >= pointsTrim) {
+        // Add point that is pointsTrimEnd behind current, skipping first pointsTrimStart
+        // This trims pointsTrimStart from start and pointsTrimEnd from end (end points stay in buffer)
+        const addIndex = rawPoints.length - 1 - pointsTrimEnd;
+        if (addIndex >= pointsTrimStart) {
             const pointToAdd = rawPoints[addIndex];
             activeStroke.addPoint(pointToAdd);
             tempPoints.push(pointToAdd);
@@ -280,7 +406,7 @@ export class Frame extends THREE.Group {
     endStroke(controllerId) {
         const activeStroke = this._activeStrokes.get(controllerId);
 
-        // Last pointsTrim points remain in _rawPoints buffer and are discarded
+        // Last pointsTrimEnd points remain in _rawPoints buffer and are discarded
         if (activeStroke && activeStroke.points.length > 1) {
             // Refine the stroke (split + smooth) before finalizing
             activeStroke.refine();
@@ -313,9 +439,6 @@ export class Frame extends THREE.Group {
      * @private
      */
     _refreshGeometry() {
-        const positions = [];
-        const colors = [];
-
         // Remove old fill meshes
         for (const mesh of this._fillMeshes) {
             this.remove(mesh);
@@ -324,52 +447,25 @@ export class Frame extends THREE.Group {
         }
         this._fillMeshes = [];
 
-        // Add all completed strokes and their fills
+        // Add all completed strokes as brush geometry
         for (const stroke of this.strokes) {
-            const segments = stroke.toLineSegments();
-            const strokeColor = new THREE.Color(stroke.color);
-
-            for (const point of segments) {
-                positions.push(point.x, point.y, point.z);
-                colors.push(strokeColor.r, strokeColor.g, strokeColor.b);
-            }
-
-            // Create fill mesh for completed stroke with stroke's color
-            const fillGeo = stroke.toFillGeometry();
-            if (fillGeo) {
-                const fillMat = new THREE.MeshBasicMaterial({
+            // Create brush mesh for completed stroke
+            const brushGeo = stroke.toBrushGeometry();
+            if (brushGeo) {
+                const brushMat = new THREE.MeshBasicMaterial({
                     color: stroke.color,
                     side: THREE.DoubleSide
                 });
-                const fillMesh = new THREE.Mesh(fillGeo, fillMat);
-                fillMesh.frustumCulled = false;
-                this.add(fillMesh);
-                this._fillMeshes.push(fillMesh);
+                const brushMesh = new THREE.Mesh(brushGeo, brushMat);
+                brushMesh.frustumCulled = false;
+                this.add(brushMesh);
+                this._fillMeshes.push(brushMesh);
             }
         }
 
-        // Add temp points from all active strokes
+        // Add temp brush geometry from all active strokes
         for (const [controllerId, tempPoints] of this._tempPoints.entries()) {
-            const activeStroke = this._activeStrokes.get(controllerId);
-            const strokeColor = new THREE.Color(activeStroke ? activeStroke.color : 0xffffff);
-
-            for (let i = 1; i < tempPoints.length; i++) {
-                positions.push(tempPoints[i - 1].x, tempPoints[i - 1].y, tempPoints[i - 1].z);
-                colors.push(strokeColor.r, strokeColor.g, strokeColor.b);
-                positions.push(tempPoints[i].x, tempPoints[i].y, tempPoints[i].z);
-                colors.push(strokeColor.r, strokeColor.g, strokeColor.b);
-            }
-            // Close the loop back to origin while drawing
-            if (tempPoints.length > 2) {
-                const last = tempPoints[tempPoints.length - 1];
-                const first = tempPoints[0];
-                positions.push(last.x, last.y, last.z);
-                colors.push(strokeColor.r, strokeColor.g, strokeColor.b);
-                positions.push(first.x, first.y, first.z);
-                colors.push(strokeColor.r, strokeColor.g, strokeColor.b);
-            }
-
-            // Update temp fill mesh for this controller
+            // Update temp brush mesh for this controller
             this._updateTempFill(controllerId, tempPoints);
         }
 
@@ -382,10 +478,6 @@ export class Frame extends THREE.Group {
                 this._tempFillMeshes.delete(controllerId);
             }
         }
-
-        // Update geometry with positions and colors
-        this.geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-        this.geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
     }
 
     /**
@@ -402,58 +494,19 @@ export class Frame extends THREE.Group {
             this._tempFillMeshes.delete(controllerId);
         }
 
-        if (tempPoints.length < 3) {
+        if (tempPoints.length < 2) {
             return;
         }
 
-        // Calculate best-fit plane normal using Newell's method
-        const normal = new THREE.Vector3(0, 0, 0);
-        for (let i = 0; i < tempPoints.length; i++) {
-            const curr = tempPoints[i];
-            const next = tempPoints[(i + 1) % tempPoints.length];
-            normal.x += (curr.y - next.y) * (curr.z + next.z);
-            normal.y += (curr.z - next.z) * (curr.x + next.x);
-            normal.z += (curr.x - next.x) * (curr.y + next.y);
-        }
-        normal.normalize();
-
-        // Create basis vectors for projection
-        let up = new THREE.Vector3(0, 1, 0);
-        if (Math.abs(normal.dot(up)) > 0.9) {
-            up = new THREE.Vector3(1, 0, 0);
-        }
-        const basisX = new THREE.Vector3().crossVectors(up, normal).normalize();
-        const basisY = new THREE.Vector3().crossVectors(normal, basisX).normalize();
-
-        // Project points to 2D
-        const points2D = tempPoints.map(p => new THREE.Vector2(
-            p.dot(basisX),
-            p.dot(basisY)
-        ));
-
-        // Use Three.js ShapeUtils for triangulation
-        let indices;
-        try {
-            indices = THREE.ShapeUtils.triangulateShape(points2D, []);
-        } catch (e) {
-            return; // Triangulation failed, skip fill
-        }
-
-        if (indices.length === 0) return;
-
-        // Build geometry with original 3D points
-        const vertices = [];
-        for (const p of tempPoints) {
-            vertices.push(p.x, p.y, p.z);
-        }
-
-        const geometry = new THREE.BufferGeometry();
-        geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
-        geometry.setIndex(indices.flat());
-        geometry.computeVertexNormals();
-
-        // Use active stroke's color for the fill
+        // Create a temporary stroke from temp points to generate brush geometry
         const activeStroke = this._activeStrokes.get(controllerId);
+        const tempStroke = new Stroke(activeStroke ? activeStroke.color : 0xffffff);
+        tempStroke.points = tempPoints.map(p => p.clone());
+        tempStroke.computePressures();
+
+        const geometry = tempStroke.toBrushGeometry();
+        if (!geometry) return;
+
         const fillColor = activeStroke ? activeStroke.color : 0xffffff;
         const fillMat = new THREE.MeshBasicMaterial({
             color: fillColor,
