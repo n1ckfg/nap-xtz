@@ -1029,6 +1029,9 @@ export function stopDrawingMode() {
         animationFrameId = null;
     }
 
+    // Convert drawing to NAPLPS before stopping
+    convertToNAPLPS();
+
     // Stop webcam
     if (video && video.srcObject) {
         video.srcObject.getTracks().forEach(track => track.stop());
@@ -1039,5 +1042,71 @@ export function stopDrawingMode() {
     labels.forEach(label => {
         if (label.container) label.container.style.display = 'none';
     });
+}
+
+function convertToNAPLPS() {
+    if (!frame || !frame.strokes || frame.strokes.length === 0) {
+        console.log('No strokes to convert');
+        return;
+    }
+
+    // NapInputWrapper, NapEncoder, Vector2, Vector3 are global (from naplps.js)
+    if (typeof window.NapInputWrapper === 'undefined' || typeof window.NapEncoder === 'undefined') {
+        console.error('NapInputWrapper or NapEncoder not available');
+        return;
+    }
+
+    const input = [];
+
+    for (const stroke of frame.strokes) {
+        if (!stroke.points || stroke.points.length < 2) continue;
+
+        // Convert hex color to RGB Vector3 (0-255)
+        const hex = stroke.color || 0xffffff;
+        const r = (hex >> 16) & 0xff;
+        const g = (hex >> 8) & 0xff;
+        const b = hex & 0xff;
+        const color = new window.Vector3(r, g, b);
+
+        // Project 3D points to 2D normalized coordinates
+        const points2D = [];
+        for (const pt of stroke.points) {
+            // Clone point and project to NDC (-1 to 1)
+            const projected = pt.clone().project(camera);
+
+            // Convert NDC to normalized 0-1 coordinates
+            // NDC: x=-1 is left, x=1 is right; y=-1 is bottom, y=1 is top
+            // NAPLPS: x=0 is left, x=1 is right; y=0 is bottom, y=1 is top
+            const nx = (projected.x + 1) / 2;
+            const ny = (projected.y + 1) / 2;
+
+            // Clamp to valid range
+            const clampedX = Math.max(0, Math.min(1, nx));
+            const clampedY = Math.max(0, Math.min(1, ny));
+
+            points2D.push(new window.Vector2(clampedX, clampedY));
+        }
+
+        // Create NapInputWrapper (not a fill, just a stroke)
+        const napStroke = new window.NapInputWrapper(color, points2D, false);
+        input.push(napStroke);
+    }
+
+    if (input.length === 0) {
+        console.log('No valid strokes to encode');
+        return;
+    }
+
+    // Encode to NAPLPS
+    const encoder = new window.NapEncoder(input);
+
+    // Load into the main canvas
+    if (typeof window.loadTelidonFromText === 'function') {
+        window.loadTelidonFromText(encoder.napRaw);
+    } else {
+        console.error('loadTelidonFromText not available');
+    }
+
+    console.log(`Converted ${input.length} strokes to NAPLPS`);
 }
 

@@ -1652,7 +1652,13 @@ class NapEncoder {
 		returns.push(this.makeNapOpcode(_isFill));
 		returns.push(this.makeNapPoints(_points));
 
-		return returns.join("");	
+		return returns.join("");
 	}
 }
 
+// Expose classes globally for ES6 modules
+window.Vector2 = Vector2;
+window.Vector3 = Vector3;
+window.NapInputWrapper = NapInputWrapper;
+window.NapEncoder = NapEncoder;
+window.NapDecoder = NapDecoder;
