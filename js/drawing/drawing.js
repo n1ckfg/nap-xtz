@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { Controller } from './controller.js';
+import { MouseController } from './mouse.js';
 import { OpenXR_WorldScale } from './worldscale.js';
 import { Frame } from './tools.js';
 import { Palette } from './palette.js';
@@ -34,6 +35,13 @@ let paletteFlickerStart = []; // When color selection flicker started
 let paletteFlickerIndex = []; // Which color index is flickering
 let controllerDrawColor = []; // Drawing color per controller (hex)
 let controllerColorRims = []; // Rim meshes showing selected color
+
+// Mouse controller state
+let mouseController = null;
+let mousePalette = null;
+let mousePaletteVisible = false;
+let mouseDrawColor = 0xffffff;
+const MOUSE_CONTROLLER_ID = 'mouse';
 
 // Keyboard/Mouse navigation state
 const keysPressed = {};
@@ -232,6 +240,16 @@ function initThreeJS() {
     // Initialize the world scale logic with our two controllers and the world group
     worldScale = new OpenXR_WorldScale(controllers[0], controllers[1], worldNode);
     frame = new Frame(worldNode);
+
+    // Initialize mouse controller
+    mouseController = new MouseController();
+    mouseController.setDrawPlaneDistance(5, camera); // Draw at camera target distance
+    scene.add(mouseController);
+
+    // Create palette for mouse controller
+    mousePalette = new Palette(0.6, 0.08);
+    mousePalette.visible = false;
+    scene.add(mousePalette);
 
     // Initialize undo/reset overlay
     undoOverlay = container.querySelector('#reset-overlay') || document.getElementById('reset-overlay');
@@ -550,6 +568,68 @@ function animateLoop() {
         // End stroke on trigger_Up
         else if (controller.trigger_Up) {
             frame.endStroke(i);
+        }
+    }
+
+    // Mouse controller update and drawing
+    if (mouseController) {
+        mouseController.update(camera);
+
+        // Right click toggles palette
+        if (mouseController.checkRightClick()) {
+            if (mousePaletteVisible) {
+                // Dismiss palette
+                mousePalette.visible = false;
+                mousePaletteVisible = false;
+                mouseController.paletteActive = false;
+            } else {
+                // Show palette at mouse position
+                mousePalette.position.copy(mouseController.position);
+                mousePalette.lookAt(camera.position);
+                mousePalette.visible = true;
+                mousePaletteVisible = true;
+                mouseController.paletteActive = true;
+                mouseController.paletteJustOpened = true;
+            }
+        }
+
+        // Handle palette color selection on left click
+        if (mousePaletteVisible && mouseController.isLeftDown && !mouseController.paletteJustOpened) {
+            // Check if mouse is over a color
+            if (mousePalette.hitTest(mouseController.position, 0.1)) {
+                const selectedColor = mousePalette.colors[mousePalette.selectedIndex].hex;
+                mouseDrawColor = selectedColor;
+                mouseController.setColor(selectedColor);
+                // Also update hand controller colors
+                for (let j = 0; j < MAX_HANDS; j++) {
+                    controllerDrawColor[j] = selectedColor;
+                    controllerColorRims[j].material.color.setHex(selectedColor);
+                }
+                // Dismiss palette
+                mousePalette.visible = false;
+                mousePaletteVisible = false;
+                mouseController.paletteActive = false;
+            }
+        }
+
+        // Reset paletteJustOpened on mouse up
+        if (!mouseController.isLeftDown) {
+            mouseController.paletteJustOpened = false;
+        }
+
+        // Drawing with mouse (only when palette not active)
+        if (!mousePaletteVisible) {
+            if (mouseController.trigger_Down) {
+                const pos = new THREE.Vector3();
+                mouseController.getDrawPosition(pos);
+                frame.beginStroke(pos, MOUSE_CONTROLLER_ID, mouseDrawColor);
+            } else if (mouseController.trigger_Held && frame.hasActiveStroke(MOUSE_CONTROLLER_ID)) {
+                const pos = new THREE.Vector3();
+                mouseController.getDrawPosition(pos);
+                frame.continueStroke(pos, MOUSE_CONTROLLER_ID);
+            } else if (mouseController.trigger_Up) {
+                frame.endStroke(MOUSE_CONTROLLER_ID);
+            }
         }
     }
 
@@ -1017,6 +1097,11 @@ export async function startDrawingMode(container) {
     await setupMediaPipe();
     await setupWebcam();
 
+    // Enable mouse controller
+    if (mouseController) {
+        mouseController.enable();
+    }
+
     // Start animation loop
     animateLoop();
 }
@@ -1031,6 +1116,17 @@ export function stopDrawingMode() {
 
     // Convert drawing to NAPLPS before stopping
     convertToNAPLPS();
+
+    // Disable mouse controller
+    if (mouseController) {
+        mouseController.disable();
+        // Hide mouse palette if visible
+        if (mousePalette) {
+            mousePalette.visible = false;
+            mousePaletteVisible = false;
+            mouseController.paletteActive = false;
+        }
+    }
 
     // Stop webcam
     if (video && video.srcObject) {
@@ -1093,7 +1189,7 @@ function convertToNAPLPS() {
 
         // Simplify points using RDP algorithm
         if (window.rdpSimplify) {
-            //points2D = window.rdpSimplify(points2D, 0.002);
+            points2D = window.rdpSimplify(points2D, 0.002);
         }
 
         // Create NapInputWrapper as filled polygon
