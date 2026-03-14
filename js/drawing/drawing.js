@@ -307,6 +307,9 @@ function onMouseMove(event) {
         cameraTheta += deltaX * mouseSensitivity;
         cameraPhi -= deltaY * mouseSensitivity;
 
+        // Clamp theta to 180-degree hemisphere (front-facing, 0 to PI)
+        cameraTheta = Math.max(0, Math.min(Math.PI, cameraTheta));
+
         // Clamp phi to avoid flipping
         cameraPhi = Math.max(0.1, Math.min(Math.PI - 0.1, cameraPhi));
     }
