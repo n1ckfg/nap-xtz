@@ -2,15 +2,17 @@
 
 An experimental NAPLPS/Telidon vector graphics viewer and editor with Tezos minting capability.
 
-### Camera Controls (Drawing Mode)
+### Drawing Mode Controls
 
+#### Keyboard and Mouse
+- Left click: Draw
+- Right click: Toggle palette
 - Alt + mouse drag: Orbit
 - Alt + Shift + mouse drag: Pan
 - Mouse wheel: Zoom
 - WASD: Move camera
 
-### Hand Gestures (Drawing Mode)
-
+#### Hand Gestures
 - Pointing Up: Draw (trigger)
 - Closed Fist: Grip (for palette/world manipulation)
 - 1 x Thumb Up: Reset camera
