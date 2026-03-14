@@ -658,6 +658,9 @@ function animateLoop() {
                     controllerDrawColor[j] = newColor;
                     controllerColorRims[j].material.color.setHex(newColor);
                 }
+                // Also update mouse controller color
+                mouseDrawColor = newColor;
+                mouseController.setColor(newColor);
                 palette.visible = false;
                 paletteLine.visible = false;
                 paletteVisible[i] = false;
