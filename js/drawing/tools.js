@@ -302,6 +302,72 @@ export class Stroke {
 
         return geometry;
     }
+
+    /**
+     * Returns the outline points of the brush stroke as a closed polygon
+     * Left edge forward, then right edge reversed
+     * @returns {THREE.Vector3[]} Array of outline points forming a closed polygon
+     */
+    toBrushOutline() {
+        if (this.points.length < 2) return [];
+
+        // Compute pressures if not already set
+        if (this.pressures.length !== this.points.length) {
+            this.computePressures();
+        }
+
+        const normal = this.computeNormal();
+        const nPoints = this.points.length;
+        const lastIndex = nPoints - 1;
+
+        const leftEdge = [];
+        const rightEdge = [];
+
+        for (let i = 0; i < nPoints; i++) {
+            const p = this.points[i];
+
+            // First and last points: fixed small radius
+            let radius;
+            if (i === 0 || i === lastIndex) {
+                radius = 0.01;
+            } else {
+                const taper = Math.pow((lastIndex - i) / Math.max(1, lastIndex), this.taperPower);
+                const pressure = this.pressures[i] || 1.0;
+                radius = Math.max(
+                    this.minThickness * this.thickness,
+                    taper * pressure * this.thickness
+                );
+            }
+
+            // Calculate tangent direction
+            let tangent = new THREE.Vector3();
+            if (i === 0) {
+                tangent.subVectors(this.points[1], p);
+            } else if (i === lastIndex) {
+                tangent.subVectors(p, this.points[i - 1]);
+            } else {
+                tangent.subVectors(this.points[i + 1], this.points[i - 1]);
+            }
+
+            const tangentLength = tangent.length();
+            if (tangentLength < 0.0001) {
+                tangent.set(1, 0, 0);
+            } else {
+                tangent.divideScalar(tangentLength);
+            }
+
+            // Calculate perpendicular in the stroke plane
+            const perp = new THREE.Vector3().crossVectors(tangent, normal).normalize();
+
+            // Create left and right edge points
+            leftEdge.push(p.clone().addScaledVector(perp, radius));
+            rightEdge.push(p.clone().addScaledVector(perp, -radius));
+        }
+
+        // Build outline: left edge forward, then right edge reversed
+        const outline = [...leftEdge, ...rightEdge.reverse()];
+        return outline;
+    }
 }
 
 export class Frame extends THREE.Group {

@@ -1061,6 +1061,10 @@ function convertToNAPLPS() {
     for (const stroke of frame.strokes) {
         if (!stroke.points || stroke.points.length < 2) continue;
 
+        // Get brush outline (closed polygon) instead of centerline
+        const outline3D = stroke.toBrushOutline();
+        if (outline3D.length < 3) continue;
+
         // Convert hex color to RGB Vector3 (0-255)
         const hex = stroke.color || 0xffffff;
         const r = (hex >> 16) & 0xff;
@@ -1068,9 +1072,9 @@ function convertToNAPLPS() {
         const b = hex & 0xff;
         const color = new window.Vector3(r, g, b);
 
-        // Project 3D points to 2D normalized coordinates
+        // Project 3D outline points to 2D normalized coordinates
         let points2D = [];
-        for (const pt of stroke.points) {
+        for (const pt of outline3D) {
             // Clone point and project to NDC (-1 to 1)
             const projected = pt.clone().project(camera);
 
@@ -1087,13 +1091,13 @@ function convertToNAPLPS() {
             points2D.push(new window.Vector2(clampedX, clampedY));
         }
 
-        // Simplify points using RDP algorithm (epsilon 0.02 matches setupSvg)
+        // Simplify points using RDP algorithm
         if (window.rdpSimplify) {
-            points2D = window.rdpSimplify(points2D, 0.002);
+            //points2D = window.rdpSimplify(points2D, 0.002);
         }
 
-        // Create NapInputWrapper (not a fill, just a stroke)
-        const napStroke = new window.NapInputWrapper(color, points2D, false);
+        // Create NapInputWrapper as filled polygon
+        const napStroke = new window.NapInputWrapper(color, points2D, true);
         input.push(napStroke);
     }
 
