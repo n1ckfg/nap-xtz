@@ -855,6 +855,7 @@ function animateLoop() {
             }
         } else {
             // Flicker done
+            const wasSingle = pendingConfirmAction === 'single';
             if (confirmOverlay) confirmOverlay.style.display = 'none';
             if (confirmCircleLeft) confirmCircleLeft.style.display = 'none';
             if (confirmCircleRight) confirmCircleRight.style.display = 'none';
@@ -865,6 +866,25 @@ function animateLoop() {
             for (const controller of controllers) {
                 controller.buttonA_Down = false;
                 controller.buttonA_Held = false;
+            }
+            // Single Button A = camera reset + world reset + show orientation objects
+            if (wasSingle) {
+                // Reset camera
+                resetCamera();
+                // Reset world origin
+                worldNode.position.set(0, 0, 0);
+                worldNode.quaternion.identity();
+                worldNode.scale.set(1, 1, 1);
+                // Reset orientation objects fade (make guide cube/pyramids reappear)
+                orientationFadeStart = now;
+                for (const obj of orientationObjects) {
+                    obj.material.opacity = 1;
+                }
+            } else {
+                // Double Button A = exit drawing mode
+                stopDrawingMode();
+                const container = window._drawingContainer;
+                if (container) container.classList.remove('active');
             }
         }
     }
