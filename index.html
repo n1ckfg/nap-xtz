@@ -450,6 +450,7 @@
 			dx = p.x - (a.x + t * dx); dy = p.y - (a.y + t * dy);
 			return Math.sqrt(dx * dx + dy * dy);
 		}
+		window.rdpSimplify = rdpSimplify;
 
 		function hexToRgb(hex) {
 				let result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);

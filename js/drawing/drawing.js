@@ -1069,7 +1069,7 @@ function convertToNAPLPS() {
         const color = new window.Vector3(r, g, b);
 
         // Project 3D points to 2D normalized coordinates
-        const points2D = [];
+        let points2D = [];
         for (const pt of stroke.points) {
             // Clone point and project to NDC (-1 to 1)
             const projected = pt.clone().project(camera);
@@ -1085,6 +1085,11 @@ function convertToNAPLPS() {
             const clampedY = Math.max(0, Math.min(1, ny));
 
             points2D.push(new window.Vector2(clampedX, clampedY));
+        }
+
+        // Simplify points using RDP algorithm (epsilon 0.02 matches setupSvg)
+        if (window.rdpSimplify) {
+            points2D = window.rdpSimplify(points2D, 0.002);
         }
 
         // Create NapInputWrapper (not a fill, just a stroke)
