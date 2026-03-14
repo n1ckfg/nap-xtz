@@ -1178,7 +1178,10 @@ function convertToNAPLPS() {
             // NDC: x=-1 is left, x=1 is right; y=-1 is bottom, y=1 is top
             // NAPLPS: x=0 is left, x=1 is right; y=0 is top, y=1 is bottom
             const nx = (projected.x + 1) / 2;
-            const ny = (1 - projected.y) / 2; // Flip Y axis
+            let ny = (1 - projected.y) / 2; // Flip Y axis
+
+            // OFFSET: Shift 15% toward bottom of screen (y=1 is bottom in NAPLPS)
+            ny = ny + 0.15;
 
             // Clamp to valid range
             const clampedX = Math.max(0, Math.min(1, nx));
