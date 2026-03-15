@@ -511,7 +511,8 @@ function animateLoop() {
             const newPos = new THREE.Vector3(worldX, worldY, worldZ);
 
             // Pass the new data into the controller wrapper
-            controller.updateState(newPos, null, isClosedFist, isOpenPalm);
+            controller.updatePose(newPos, null);
+            controller.updateGrip(isClosedFist, isOpenPalm);
             controller.updateTrigger(isPointingUp, isOpenPalm, isClosedFist);
             controller.updateButtonA(isThumbUp);
             controller.updateButtonB(isThumbDown);
@@ -541,7 +542,8 @@ function animateLoop() {
 
     // For hands that are no longer detected, keep grip state unchanged (only open_palm releases)
     for (let i = results?.landmarks?.length || 0; i < MAX_HANDS; i++) {
-        controllers[i].updateState(null, null, false, false);
+        controllers[i].updatePose(null, null);
+        controllers[i].updateGrip(false, false);
         controllers[i].updateTrigger(false, false, false);
         controllers[i].updateButtonA(false);
         controllers[i].updateButtonB(false);

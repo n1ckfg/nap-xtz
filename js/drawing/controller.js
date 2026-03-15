@@ -199,13 +199,11 @@ export class Controller extends THREE.Object3D {
     }
 
     /**
-     * Updates the controller's pose and gesture state.
+     * Updates only the controller's pose (position and rotation).
      * @param {THREE.Vector3} position - The new position of the controller
      * @param {THREE.Quaternion} [rotation] - The new rotation of the controller (optional)
-     * @param {boolean} isClosedFist - True if the closed fist gesture is detected
-     * @param {boolean} isOpenPalm - True if the open palm gesture is detected
      */
-    updateState(position, rotation, isClosedFist, isOpenPalm) {
+    updatePose(position, rotation) {
         if (position) {
             if (this.kalmanEnabled) {
                 // Update drawing position (50% smoothing - more responsive)
@@ -237,7 +235,14 @@ export class Controller extends THREE.Object3D {
         if (rotation) {
             this.quaternion.copy(rotation);
         }
+    }
 
+    /**
+     * Updates only the grip state based on gestures.
+     * @param {boolean} isClosedFist - True if the closed fist gesture is detected
+     * @param {boolean} isOpenPalm - True if the open palm gesture is detected
+     */
+    updateGrip(isClosedFist, isOpenPalm) {
         const now = performance.now();
 
         // Track when we last saw closed fist
