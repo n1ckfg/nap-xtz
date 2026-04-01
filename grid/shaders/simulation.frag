@@ -22,15 +22,48 @@ uniform float u_delayFrames;
 uniform float u_lifeFrames;
 uniform float u_respawnFrames;
 uniform float u_chaos;
+uniform vec3 u_napColor;  // NAPLPS color (RGB 0-1)
 
 // State encoding (8-bit safe):
 // R: state (0=idle, 0.25=kaboom, 0.5=clicked, 0.75=respawn)
 // G: countdown (1.0 to 0.0)
-// B: unused
-// A: random color value
+// B: NAPLPS color hue (0-1)
+// A: NAPLPS color saturation/brightness
 
 float hash(vec2 p) {
     return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+}
+
+// Convert RGB to hue (0-1)
+float rgbToHue(vec3 c) {
+    float maxC = max(max(c.r, c.g), c.b);
+    float minC = min(min(c.r, c.g), c.b);
+    float delta = maxC - minC;
+
+    if (delta < 0.001) return 0.0;
+
+    float hue = 0.0;
+    if (maxC == c.r) {
+        hue = mod((c.g - c.b) / delta, 6.0);
+    } else if (maxC == c.g) {
+        hue = (c.b - c.r) / delta + 2.0;
+    } else {
+        hue = (c.r - c.g) / delta + 4.0;
+    }
+    return hue / 6.0;
+}
+
+// Get saturation
+float rgbToSat(vec3 c) {
+    float maxC = max(max(c.r, c.g), c.b);
+    float minC = min(min(c.r, c.g), c.b);
+    if (maxC < 0.001) return 0.0;
+    return (maxC - minC) / maxC;
+}
+
+// Get value/brightness
+float rgbToVal(vec3 c) {
+    return max(max(c.r, c.g), c.b);
 }
 
 void main() {
@@ -40,11 +73,13 @@ void main() {
     vec4 current = texture2D(u_state, uv);
     float state = current.r;
     float countdown = current.g;
-    float colorVal = current.a;
+    float colorHue = current.b;     // NAPLPS hue
+    float colorSatVal = current.a;  // Combined sat/val
 
-    // Initialize color if needed
-    if (colorVal < 0.01) {
-        colorVal = 0.3 + 0.7 * hash(gl_FragCoord.xy);
+    // Initialize color if needed (for non-NAPLPS mode)
+    if (colorSatVal < 0.01) {
+        colorHue = hash(gl_FragCoord.xy);
+        colorSatVal = 0.5 + 0.5 * hash(gl_FragCoord.xy + vec2(0.5, 0.5));
     }
 
     float randVal = hash(gl_FragCoord.xy + vec2(fract(u_time * 7.3), fract(u_time * 11.1)));
@@ -105,24 +140,40 @@ void main() {
         float r7 = hash(gl_FragCoord.xy + vec2(fract(u_time * 23.7), 0.8));
 
         // Neighbors spread TO us based on their direction odds
-        triggered += nwClicked * step(r0, u_oddsSE);
-        triggered += nClicked  * step(r1, u_oddsS);
-        triggered += neClicked * step(r2, u_oddsSW);
-        triggered += wClicked  * step(r3, u_oddsE);
-        triggered += eClicked  * step(r4, u_oddsW);
-        triggered += swClicked * step(r5, u_oddsNE);
-        triggered += sClicked  * step(r6, u_oddsN);
-        triggered += seClicked * step(r7, u_oddsNW);
+        // Also track which neighbor triggered us to inherit their color
+        float t0 = nwClicked * step(r0, u_oddsSE);
+        float t1 = nClicked  * step(r1, u_oddsS);
+        float t2 = neClicked * step(r2, u_oddsSW);
+        float t3 = wClicked  * step(r3, u_oddsE);
+        float t4 = eClicked  * step(r4, u_oddsW);
+        float t5 = swClicked * step(r5, u_oddsNE);
+        float t6 = sClicked  * step(r6, u_oddsN);
+        float t7 = seClicked * step(r7, u_oddsNW);
+
+        triggered = t0 + t1 + t2 + t3 + t4 + t5 + t6 + t7;
 
         if (triggered > 0.5) {
             newState = 0.25;  // KABOOM
             newCountdown = mix(0.7, 1.0, randVal * u_chaos + (1.0 - u_chaos));
+
+            // Inherit color from the first triggering neighbor
+            if (t0 > 0.5) { colorHue = nw.b; colorSatVal = nw.a; }
+            else if (t1 > 0.5) { colorHue = n.b; colorSatVal = n.a; }
+            else if (t2 > 0.5) { colorHue = ne.b; colorSatVal = ne.a; }
+            else if (t3 > 0.5) { colorHue = w.b; colorSatVal = w.a; }
+            else if (t4 > 0.5) { colorHue = e.b; colorSatVal = e.a; }
+            else if (t5 > 0.5) { colorHue = sw.b; colorSatVal = sw.a; }
+            else if (t6 > 0.5) { colorHue = s.b; colorSatVal = s.a; }
+            else if (t7 > 0.5) { colorHue = se.b; colorSatVal = se.a; }
         }
 
-        // Direct click from target
+        // Direct click from target - use NAPLPS color
         if (targetDist < cellSize * 2.5 && u_targetClicked > 0.5) {
             newState = 0.5;  // CLICKED
             newCountdown = 1.0;
+            // Store NAPLPS color as hue + sat/val
+            colorHue = rgbToHue(u_napColor);
+            colorSatVal = rgbToSat(u_napColor) * 0.5 + rgbToVal(u_napColor) * 0.5;
         }
     }
     // KABOOM state (0.2 < state < 0.3)
@@ -150,5 +201,5 @@ void main() {
         }
     }
 
-    gl_FragColor = vec4(newState, newCountdown, 0.0, colorVal);
+    gl_FragColor = vec4(newState, newCountdown, colorHue, colorSatVal);
 }

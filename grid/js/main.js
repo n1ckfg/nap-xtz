@@ -25,6 +25,10 @@ let renderBuffer;
 // Target (autonomous cursor)
 let target;
 
+// NAPLPS reader
+let naplpsReader = null;
+let currentNaplpsColor = { r: 255, g: 255, b: 255 };
+
 // Propagation odds: NW, N, NE, W, E, SW, S, SE
 let odds = [0, 0.5, 0, 0.5, 0.5, 0, 0.5, 0];
 
@@ -39,9 +43,22 @@ const patterns = [
     { odds: [null, null, null, null, null, null, null, null], randomize: [0,1,2,3,4,5,6,7] }
 ];
 
+// Default NAPLPS file to load
+const defaultNaplpsFile = '../images/output_20260222_181752.nap';
+
 function preload() {
     simulationShader = loadShader('shaders/passthrough.vert', 'shaders/simulation.frag');
     renderShader = loadShader('shaders/passthrough.vert', 'shaders/render.frag');
+
+    // Load default NAPLPS file
+    loadStrings(defaultNaplpsFile, function(response) {
+        let reader = new FileReader();
+        reader.onload = function(e) {
+            naplpsReader = new NaplpsReader(e.target.result);
+            console.log("NAPLPS loaded:", naplpsReader.allPoints.length, "points");
+        };
+        reader.readAsText(new Blob(response), 'UTF-8');
+    });
 }
 
 function setup() {
@@ -82,8 +99,9 @@ function setup() {
 
     target = new Target();
     setupPattern();
+    setupDragDrop();
 
-    console.log("GridJoe GPU - p5.js Framebuffer ping-pong initialized");
+    console.log("GridJoe GPU + NAPLPS - initialized");
 }
 
 function setupPattern() {
@@ -105,11 +123,16 @@ function setupPattern() {
 }
 
 function draw() {
-    target.run();
+    target.run(naplpsReader);
     if (target.armResetAll) {
         //resetAll();
         setupPattern(); // Only change pattern, keep animation
         target.armResetAll = false;
+    }
+
+    // Update current color from NAPLPS
+    if (naplpsReader && naplpsReader.getCurrentPoint()) {
+        currentNaplpsColor = naplpsReader.getCurrentPoint().color;
     }
 
     let readFBO = currentBuffer === 0 ? fboA : fboB;
@@ -137,6 +160,12 @@ function draw() {
     simulationShader.setUniform('u_lifeFrames', lifeCounter);
     simulationShader.setUniform('u_respawnFrames', respawnCounter);
     simulationShader.setUniform('u_chaos', globalChaos);
+    // Pass NAPLPS color to simulation shader
+    simulationShader.setUniform('u_napColor', [
+        currentNaplpsColor.r / 255.0,
+        currentNaplpsColor.g / 255.0,
+        currentNaplpsColor.b / 255.0
+    ]);
     renderBuffer.rect(-sW/2, -sH/2, sW, sH);
     writeFBO.end();
 
@@ -161,6 +190,38 @@ function keyPressed() {
     resetAll();
 }
 
+// Drag and drop NAPLPS files
+function setupDragDrop() {
+    let dropZone = document.body;
+
+    dropZone.addEventListener('dragover', function(e) {
+        e.stopPropagation();
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'copy';
+    });
+
+    dropZone.addEventListener('drop', function(e) {
+        e.stopPropagation();
+        e.preventDefault();
+        let file = e.dataTransfer.files[0];
+        if (file) {
+            let reader = new FileReader();
+            reader.onload = function(e2) {
+                loadNaplpsFromText(e2.target.result);
+            };
+            reader.readAsText(file, 'UTF-8');
+        }
+    });
+}
+
+function loadNaplpsFromText(napRaw) {
+    naplpsReader = new NaplpsReader(napRaw);
+    naplpsReader.reset();
+    console.log("NAPLPS loaded:", naplpsReader.allPoints.length, "points");
+    // Reset the grid when loading new file
+    resetAll();
+}
+
 function resetAll() {
     fboA.begin();
     renderBuffer.clear();
@@ -178,37 +239,64 @@ function windowResized() {
     resizeCanvas(canvasW, canvasH);
 }
 
-// Target class
+// Target class - follows NAPLPS points when available
 class Target {
     constructor() {
-        this.speedMin = 0.01;
-        this.speedMax = 0.05;
-        this.speed = 0.03;
+        this.speedMin = 0.02;
+        this.speedMax = 0.08;
+        this.speed = 0.05;
         this.clickOdds = 0.1;
-        this.chooseOdds = 0.01;
+        this.chooseOdds = 0.005;
         this.markTime = 0;
-        this.timeInterval = 200;
+        this.timeInterval = 100;  // Faster for NAPLPS following
         this.posX = 0;
         this.posY = 0;
         this.targetX = 0;
         this.targetY = 0;
-        this.minDist = 5;
-        this.clicked = false;
+        this.minDist = 3;
+        this.clicked = true;  // Always clicked when following NAPLPS
         this.armResetAll = false;
-        this.pickTarget();
+        this.useNaplps = true;  // Toggle for NAPLPS following mode
+        this.pickTarget(null);
     }
 
-    run() {
+    run(naplpsReader) {
         this.posX = lerp(this.posX, this.targetX, this.speed);
         this.posY = lerp(this.posY, this.targetY, this.speed);
-        if (millis() > this.markTime + this.timeInterval ||
-            dist(this.posX, this.posY, this.targetX, this.targetY) < this.minDist) {
-            this.pickTarget();
+
+        let shouldPickNew = millis() > this.markTime + this.timeInterval ||
+            dist(this.posX, this.posY, this.targetX, this.targetY) < this.minDist;
+
+        if (shouldPickNew) {
+            this.pickTarget(naplpsReader);
         }
     }
 
-    pickTarget() {
+    pickTarget(naplpsReader) {
         this.markTime = millis();
+
+        // If NAPLPS reader is available and has points, follow them
+        if (this.useNaplps && naplpsReader && naplpsReader.allPoints.length > 0) {
+            let point = naplpsReader.getNextPoint();
+            if (point) {
+                // Convert normalized coords (0-1) to shader coords (-sW/2 to sW/2)
+                this.targetX = (point.x - 0.5) * sW;
+                this.targetY = (point.y - 0.5) * sH;
+                this.speed = random(this.speedMin, this.speedMax);
+                this.clicked = true;  // Always drawing when following NAPLPS
+
+                // Check if we completed a loop - chance to change pattern
+                if (naplpsReader.hasLooped()) {
+                    let r = random(1);
+                    if (r < this.chooseOdds * 10) {
+                        this.armResetAll = true;
+                    }
+                }
+                return;
+            }
+        }
+
+        // Fallback to random movement if no NAPLPS
         this.targetX = lerp(this.posX, random(-sW/2, sW/2), 0.5);
         this.targetY = lerp(this.posY, random(-sH/2, sH/2), 0.5);
         this.speed = random(this.speedMin, this.speedMax);

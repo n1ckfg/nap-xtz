@@ -41,3 +41,42 @@
 
 Drawing mode exports `startDrawingMode(container)` and `stopDrawingMode()` for launching from index.html. The module uses `window._drawingContainer` to reference DOM elements within the active container.
 
+---
+
+## Grid Project (grid/)
+
+GPU-accelerated cellular automaton that follows NAPLPS drawing paths.
+
+### Files
+
+**grid/index.html** - Entry point, includes NAPLPS libraries
+
+**grid/js/**
+- `main.js` - p5.js setup, shader pipeline, Target class, drag-and-drop
+- `telidon.js` - Simplified NAPLPS parser extracting points and colors
+
+**grid/shaders/**
+- `passthrough.vert` - Vertex shader
+- `simulation.frag` - State machine (idle/kaboom/clicked/respawn), stores NAPLPS color per cell
+- `render.frag` - HSV-to-RGB conversion for colored dot rendering
+
+**grid/css/main.css** - Fullscreen centered canvas
+
+### How It Works
+
+1. **NAPLPS Loading**: `NaplpsReader` parses NAPLPS via `NapDecoder`, extracts all points with their associated colors into `allPoints[]`
+
+2. **Target Following**: The `Target` class calls `naplpsReader.getNextPoint()` to traverse NAPLPS points sequentially, converting normalized coords (0-1) to shader space (-sW/2 to sW/2)
+
+3. **Color Storage**: When target clicks a cell, the simulation shader converts the current NAPLPS RGB to hue + sat/val and stores in the B and A channels
+
+4. **Color Propagation**: When cells trigger neighbors (KABOOM state), they inherit the triggering neighbor's color values
+
+5. **Rendering**: The render shader converts stored hue back to RGB via `hsv2rgb()` for colored output
+
+### Usage
+
+- Loads default NAPLPS file on startup (`../images/output_20260222_181752.nap`)
+- Drag & drop any .nap file to load
+- Press any key to reset grid and pick new propagation pattern
+
