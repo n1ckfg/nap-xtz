@@ -29,6 +29,10 @@ let target;
 let naplpsReader = null;
 let currentNaplpsColor = { r: 255, g: 255, b: 255 };
 
+// Debug path visualization
+let debugPath = [];
+let debugEnabled = true;
+
 // Propagation odds: NW, N, NE, W, E, SW, S, SE
 let odds = [0, 0.5, 0, 0.5, 0.5, 0, 0.5, 0];
 
@@ -52,12 +56,9 @@ function preload() {
 
     // Load default NAPLPS file
     loadStrings(defaultNaplpsFile, function(response) {
-        let reader = new FileReader();
-        reader.onload = function(e) {
-            naplpsReader = new NaplpsReader(e.target.result);
-            console.log("NAPLPS loaded:", naplpsReader.allPoints.length, "points");
-        };
-        reader.readAsText(new Blob(response), 'UTF-8');
+        let napRaw = response.join('\n');
+        naplpsReader = new NaplpsReader(napRaw);
+        console.log("NAPLPS loaded:", naplpsReader.allPoints.length, "points");
     });
 }
 
@@ -184,6 +185,24 @@ function draw() {
     // --- Draw scaled to main canvas ---
     clear();
     image(renderBuffer, 0, 0, width, height);
+
+    // Debug: draw path polyline
+    if (debugEnabled) {
+        // Record current target position (convert shader coords to canvas coords)
+        let canvasX = (target.posX / sW + 0.5) * width;
+        let canvasY = (-target.posY / sH + 0.5) * height;
+        debugPath.push({ x: canvasX, y: canvasY });
+
+        // Draw the path
+        stroke(255);
+        strokeWeight(1);
+        noFill();
+        beginShape();
+        for (let pt of debugPath) {
+            vertex(pt.x, pt.y);
+        }
+        endShape();
+    }
 }
 
 function keyPressed() {
@@ -230,6 +249,8 @@ function resetAll() {
     renderBuffer.clear();
     fboB.end();
     setupPattern();
+    debugPath = [];  // Clear debug path on reset
+    if (naplpsReader) naplpsReader.reset();  // Restart from beginning
 }
 
 function windowResized() {
@@ -237,71 +258,4 @@ function windowResized() {
     let canvasW = sW * scaleFactor;
     let canvasH = sH * scaleFactor;
     resizeCanvas(canvasW, canvasH);
-}
-
-// Target class - follows NAPLPS points when available
-class Target {
-    constructor() {
-        this.speedMin = 0.02;
-        this.speedMax = 0.08;
-        this.speed = 0.05;
-        this.clickOdds = 0.1;
-        this.chooseOdds = 0.005;
-        this.markTime = 0;
-        this.timeInterval = 100;  // Faster for NAPLPS following
-        this.posX = 0;
-        this.posY = 0;
-        this.targetX = 0;
-        this.targetY = 0;
-        this.minDist = 3;
-        this.clicked = true;  // Always clicked when following NAPLPS
-        this.armResetAll = false;
-        this.useNaplps = true;  // Toggle for NAPLPS following mode
-        this.pickTarget(null);
-    }
-
-    run(naplpsReader) {
-        this.posX = lerp(this.posX, this.targetX, this.speed);
-        this.posY = lerp(this.posY, this.targetY, this.speed);
-
-        let shouldPickNew = millis() > this.markTime + this.timeInterval ||
-            dist(this.posX, this.posY, this.targetX, this.targetY) < this.minDist;
-
-        if (shouldPickNew) {
-            this.pickTarget(naplpsReader);
-        }
-    }
-
-    pickTarget(naplpsReader) {
-        this.markTime = millis();
-
-        // If NAPLPS reader is available and has points, follow them
-        if (this.useNaplps && naplpsReader && naplpsReader.allPoints.length > 0) {
-            let point = naplpsReader.getNextPoint();
-            if (point) {
-                // Convert normalized coords (0-1) to shader coords (-sW/2 to sW/2)
-                this.targetX = (point.x - 0.5) * sW;
-                this.targetY = (point.y - 0.5) * sH;
-                this.speed = random(this.speedMin, this.speedMax);
-                this.clicked = true;  // Always drawing when following NAPLPS
-
-                // Check if we completed a loop - chance to change pattern
-                if (naplpsReader.hasLooped()) {
-                    let r = random(1);
-                    if (r < this.chooseOdds * 10) {
-                        this.armResetAll = true;
-                    }
-                }
-                return;
-            }
-        }
-
-        // Fallback to random movement if no NAPLPS
-        this.targetX = lerp(this.posX, random(-sW/2, sW/2), 0.5);
-        this.targetY = lerp(this.posY, random(-sH/2, sH/2), 0.5);
-        this.speed = random(this.speedMin, this.speedMax);
-        let r = random(1);
-        if (r < this.clickOdds) this.clicked = !this.clicked;
-        if (r < this.chooseOdds) this.armResetAll = true;
-    }
 }
