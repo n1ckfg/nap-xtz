@@ -41,9 +41,10 @@ class Target {
         if (this.useNaplps && naplpsReader && naplpsReader.allPoints.length > 0) {
             let point = naplpsReader.getNextPoint();
             if (point) {
-                // Convert normalized coords (0-1) to shader coords (-sW/2 to sW/2)
+                // Convert normalized coords (0-1) to shader coords
+                // Use sW for both dimensions to maintain square aspect ratio (like main app)
                 this.targetX = (point.x - 0.5) * sW;
-                this.targetY = (point.y - 0.5) * sH;
+                this.targetY = (point.y - 0.5) * sW;
                 this.speed = random(this.speedMin, this.speedMax);
                 this.clicked = true;  // Always drawing when following NAPLPS
 
@@ -60,7 +61,7 @@ class Target {
 
         // Fallback to random movement if no NAPLPS
         this.targetX = lerp(this.posX, random(-sW/2, sW/2), 0.5);
-        this.targetY = lerp(this.posY, random(-sH/2, sH/2), 0.5);
+        this.targetY = lerp(this.posY, random(-sW/2, sW/2), 0.5);
         this.speed = random(this.speedMin, this.speedMax);
         let r = random(1);
         if (r < this.clickOdds) this.clicked = !this.clicked;

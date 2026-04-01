@@ -189,8 +189,9 @@ function draw() {
     // Debug: draw path polyline
     if (debugEnabled) {
         // Record current target position (convert shader coords to canvas coords)
+        // Use sW for both dimensions to match square aspect ratio
         let canvasX = (target.posX / sW + 0.5) * width;
-        let canvasY = (target.posY / sH + 0.5) * height;
+        let canvasY = (target.posY / sW + 0.5) * height;
         debugPath.push({ x: canvasX, y: canvasY });
 
         // Draw the path
