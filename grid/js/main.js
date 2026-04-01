@@ -190,7 +190,7 @@ function draw() {
     if (debugEnabled) {
         // Record current target position (convert shader coords to canvas coords)
         let canvasX = (target.posX / sW + 0.5) * width;
-        let canvasY = (-target.posY / sH + 0.5) * height;
+        let canvasY = (target.posY / sH + 0.5) * height;
         debugPath.push({ x: canvasX, y: canvasY });
 
         // Draw the path
