@@ -1,11 +1,11 @@
 "use strict";
 
 // ─── Configuration ────────────────────────────────────────────────────────────
-// After deploying fa2-naplps.mligo to Ghostnet, paste the resulting KT1 address here.
-const CONTRACT_ADDRESS = "KT1NjXnehzE7RRREsZ3UuWorJY75anjeWnjJ";
+// After deploying fa2-naplps.mligo to Shadownet, paste the resulting KT1 address here.
+const CONTRACT_ADDRESS = "KT1DypSEV87pwiw6swdYqhDKWRBZ7xfqeS3c";
 
-const TZKT_BASE    = "https://api.ghostnet.tzkt.io/v1";
-const GHOSTNET_RPC = "https://rpc.ghostnet.teztnets.com";
+const TZKT_BASE     = "https://api.shadownet.tzkt.io/v1";
+const SHADOWNET_RPC = "https://rpc.shadownet.teztnets.com";
 
 // ─── State ────────────────────────────────────────────────────────────────────
 let _beaconClient  = null;
@@ -83,10 +83,10 @@ async function initTezos() {
         }
 
         // Beacon SDK v4+: network must be declared at construction time.
-        const networkType = (SDK.NetworkType && SDK.NetworkType.GHOSTNET) || "ghostnet";
+        // Shadownet is a custom network; specify RPC URL explicitly.
         _beaconClient = new SDK.DAppClient({
             name: "NAP-XTZ",
-            network: { type: networkType },
+            network: { type: "custom", name: "shadownet", rpcUrl: SHADOWNET_RPC },
             // Disable deprecated P2P matrix relay (papers.tech servers are offline).
             enableMetrics: false,
             featuresConfig: {
@@ -202,7 +202,7 @@ async function mintCurrentNaplps() {
         const result = await mintNaplpsToken(napRaw);
         console.log("[nap-xtz] requestOperation result:", result);
         setStatus("Transaction sent, waiting for confirmation...");
-        // Ghostnet block time ~15 s; allow two blocks + TzKT indexing lag.
+        // Shadownet block time ~15 s; allow two blocks + TzKT indexing lag.
         setTimeout(async () => {
             await loadLatestToken();
         }, 45000);
@@ -264,8 +264,8 @@ async function loadLatestToken() {
             
             // If we have an operation hash, use that as the link.
             // Otherwise, fall back to the token view.
-            const link = `https://ghostnet.tzkt.io/${CONTRACT_ADDRESS}/operations/`; //${latestId}`;
-            
+            const link = `https://shadownet.tzkt.io/${CONTRACT_ADDRESS}/operations/`; //${latestId}`;
+
             setStatus(`<a href="${link}" target="_blank" style="color: inherit; text-decoration: underline;">Latest token</a> loaded from chain`);
         } else {
             console.log("[nap-xtz] no tokens on chain yet");
@@ -306,7 +306,7 @@ async function readLatestNaplps() {
         return null;
     }
 
-    console.log("Token url: " + "https://ghostnet.tzkt.io/" + entry.hash + "/" + entry.id);
+    console.log("Token url: " + "https://shadownet.tzkt.io/" + entry.hash + "/" + entry.id);
 
     return {
         napRaw: hexToString(hexNaplps),

@@ -10,10 +10,10 @@
       --output-file fa2-naplps.tz
 
   ── Initial storage (Micheline) for origination ───────────────────────────────
-    (Pair (Pair {} {}) (Pair {} 0))
+    (Pair (Pair {} 0) {} {})
 
   ── Originate with octez-client ──────────────────────────────────────────────
-    octez-client --endpoint https://rpc.ghostnet.teztnets.com \
+    octez-client --endpoint https://rpc.shadownet.teztnets.com \
       originate contract fa2-naplps \
       transferring 0 from <my-account> \
       running fa2-naplps.tz \

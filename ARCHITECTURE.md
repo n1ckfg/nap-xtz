@@ -20,8 +20,8 @@
 
 **js/tezos/tezos.js** - Tezos blockchain integration:
 - Beacon SDK wallet connection
-- FA2 NFT minting to Ghostnet
-- Contract address: `KT1NjXnehzE7RRREsZ3UuWorJY75anjeWnjJ`
+- FA2 NFT minting to Shadownet
+- Contract address: `KT1DypSEV87pwiw6swdYqhDKWRBZ7xfqeS3c`
 
 **js/drawing/** - 3D hand-tracking drawing mode (ES modules, Three.js):
 - `drawing.js` - Main entry, MediaPipe gesture recognition, camera controls
