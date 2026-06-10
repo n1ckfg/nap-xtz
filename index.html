@@ -45,6 +45,21 @@
 
 			let scaleFactor = 1;
 
+			// Slideshow mode: toggled on by the "slideshow" link. While active it
+			// plays a random .nap from ./images every slideshow_interval seconds.
+			// Loading specific content or entering live drawing stops it.
+			let slideshow_interval = 15; // seconds
+			let slideshowActive = false;
+			let liveDrawingActive = false;
+			let slideshowPlayTimer = null; // interval between slides
+			// Fallback list (used if ./images/nap-list.json fails to load).
+			let napFiles = [
+			    "output_20260222_181752.nap", "output_20260222_181957.nap",
+			    "output_20260222_181616.nap", "output_20260222_181140.nap",
+			    "output_20260222_181729.nap", "output_20260222_181558.nap",
+			    "output_20260222_181503.nap"
+			];
+
 			let dropZone;
 			let sW = 640;
 			let sH = 480;
@@ -102,52 +117,31 @@
 			    */
 				document.getElementById("latest").addEventListener("click", function() {
                     telidon = [];
+				    stopSlideshow();
 				    loop(); // redraw now; loadLatestToken() re-loops when content arrives
 			        loadLatestToken();
 			    });
-				
+
 				document.getElementById("clear").addEventListener("click", function() {
                     telidon = [];
+				    stopSlideshow();
 				    loop(); // redraw once to show the placeholder, then idle
 			    });
 
-			    document.getElementById("one").addEventListener("click", function() {
-			        loadNewTelidon("./images/output_20260222_181752.nap");
-			        //setPreview("shark");
-			    });
-
-			    document.getElementById("two").addEventListener("click", function() {
-			        loadNewTelidon("./images/output_20260222_181957.nap");
-			        //setPreview("skull");
-			    });
-
-			    document.getElementById("three").addEventListener("click", function() {
-			        loadNewTelidon("./images/output_20260222_181616.nap");
-			        //setPreview("santa");
-			    });
-
-			   document.getElementById("four").addEventListener("click", function() {
-			        loadNewTelidon("./images/output_20260222_181140.nap");
-			        //setPreview("beer");
-			    });
-
-			    document.getElementById("five").addEventListener("click", function() {
-			        loadNewTelidon("./images/output_20260222_181729.nap");
-			        //setPreview("haunt");
-			    });
-
-			    document.getElementById("six").addEventListener("click", function() {
-			        loadNewTelidon("./images/output_20260222_181558.nap");
-			        //setPreview("email");
-			    });
-
-			    document.getElementById("seven").addEventListener("click", function() {
-			        loadNewTelidon("./images/output_20260222_181503.nap");
-			        //setPreview("mouse");
+			    // Start the slideshow (loading other content stops it).
+			    document.getElementById("slideshow").addEventListener("click", function() {
+			        startSlideshow();
 			    });
 
 			    // Initialise Tezos wallet and load latest on-chain token.
 			    initTezos();
+
+			    // Load the .nap manifest for slideshow mode (falls back to the
+			    // hardcoded napFiles list if the fetch fails).
+			    fetch("./images/nap-list.json")
+			        .then(function(r) { return r.json(); })
+			        .then(function(list) { if (Array.isArray(list) && list.length) napFiles = list; })
+			        .catch(function() { /* keep fallback list */ });
 			}
 
 			function draw() {
@@ -225,6 +219,7 @@
 			}
 
 			function loadTelidonFromText(input, doClear=true) {
+				stopSlideshow(); // deliberate content load takes over from the slideshow
 				window.pendingNapRaw = input;
 				if (doClear) {
 					telidon = []
@@ -256,6 +251,33 @@
 			        }
 			        reader.readAsText(new Blob(response), 'UTF-8');
 			    });
+			}
+
+			// ── Slideshow mode ──
+
+			function startSlideshow() {
+			    if (liveDrawingActive || slideshowActive) return;
+			    slideshowActive = true;
+			    loadRandomNap();
+			    slideshowPlayTimer = setInterval(function() {
+			        if (liveDrawingActive) { stopSlideshow(); return; }
+			        loadRandomNap();
+			    }, slideshow_interval * 1000);
+			}
+
+			function stopSlideshow() {
+			    slideshowActive = false;
+			    if (slideshowPlayTimer !== null) {
+			        clearInterval(slideshowPlayTimer);
+			        slideshowPlayTimer = null;
+			    }
+			}
+			window.stopSlideshow = stopSlideshow;
+
+			function loadRandomNap() {
+			    if (!napFiles.length) return;
+			    const file = napFiles[Math.floor(Math.random() * napFiles.length)];
+			    loadNewTelidon("./images/" + file);
 			}
 
 			//function setPreview(name) {
@@ -509,13 +531,7 @@
 				&nbsp;&nbsp;<a href="https://github.com/n1ckfg/nap-xtz"><i>source</i></a>&nbsp;&nbsp;|&nbsp;&nbsp;
 				<a href="javascript:void(0)" id="latest"><i>latest</i></a>&nbsp;&nbsp;|&nbsp;&nbsp;
 				<a href="javascript:void(0)" id="clear"><i>clear</i></a>&nbsp;&nbsp;|&nbsp;&nbsp;
-				<a href="javascript:void(0)" id="one">one</a>&nbsp;&nbsp;|&nbsp;&nbsp;
-				<a href="javascript:void(0)" id="two">two</a>&nbsp;&nbsp;|&nbsp;&nbsp;
-				<a href="javascript:void(0)" id="three">three</a>&nbsp;&nbsp;|&nbsp;&nbsp;
-				<a href="javascript:void(0)" id="four">four</a>&nbsp;&nbsp;|&nbsp;&nbsp;
-				<a href="javascript:void(0)" id="five">five</a>&nbsp;&nbsp;|&nbsp;&nbsp;
-				<a href="javascript:void(0)" id="six">six</a>&nbsp;&nbsp;|&nbsp;&nbsp;
-				<a href="javascript:void(0)" id="seven">seven</a>
+				<a href="javascript:void(0)" id="slideshow"><i>slideshow</i></a>
 			</div>
 
 			<!--<div class="preview-base" id="preview"></div>
@@ -553,9 +569,9 @@
 					</form> 
 				</div>
 				<div style="position: relative; margin-left: 180px; margin-top: -60px;">
-					<button id="btn-connect" class="tezos-btn" onclick="connectWallet()">Connect Wallet</button>
-					<button id="btn-disconnect" class="tezos-btn" onclick="disconnectWallet()" style="display:none">Disconnect</button><br>
-					<button id="btn-mint" class="tezos-btn" onclick="mintCurrentNaplps()">Mint to Tezos</button><br>
+					<button id="btn-connect" class="tezos-btn" onclick="stopSlideshow(); connectWallet()">Connect Wallet</button>
+					<button id="btn-disconnect" class="tezos-btn" onclick="stopSlideshow(); disconnectWallet()" style="display:none">Disconnect</button><br>
+					<button id="btn-mint" class="tezos-btn" onclick="stopSlideshow(); mintCurrentNaplps()">Mint to Tezos</button><br>
 					<span id="tezos-address" class="tezos-address"></span><br>
 					<span id="tezos-status" class="tezos-status"></span><br>
 					<span id="tezos-size" class="tezos-size"></span><br>
@@ -586,6 +602,8 @@
 
 			document.getElementById('btn-live-drawing').addEventListener('click', async () => {
 				telidon = [];
+				liveDrawingActive = true; // block slideshow while drawing
+				stopSlideshow();
 				const container = document.getElementById('drawing-container');
 				container.classList.add('active');
 				await startDrawingMode(container);
@@ -595,6 +613,7 @@
 				stopDrawingMode();
 				const container = document.getElementById('drawing-container');
 				container.classList.remove('active');
+				liveDrawingActive = false;
 				loop(); // refresh the main canvas (handles exit with no strokes drawn)
 			});
 		</script>
