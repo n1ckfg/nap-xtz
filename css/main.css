@@ -103,6 +103,11 @@ a:hover {
 	color: #ffffff;
 }
 
+/* Slideshow link turns pale green while the slideshow is running. */
+#slideshow.active {
+	color: #90ee90;
+}
+
 #preview {
 	/* */
 }

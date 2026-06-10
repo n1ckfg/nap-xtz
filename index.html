@@ -258,6 +258,8 @@
 			function startSlideshow() {
 			    if (liveDrawingActive || slideshowActive) return;
 			    slideshowActive = true;
+			    const link = document.getElementById("slideshow");
+			    if (link) link.classList.add("active");
 			    loadRandomNap();
 			    slideshowPlayTimer = setInterval(function() {
 			        if (liveDrawingActive) { stopSlideshow(); return; }
@@ -267,6 +269,8 @@
 
 			function stopSlideshow() {
 			    slideshowActive = false;
+			    const link = document.getElementById("slideshow");
+			    if (link) link.classList.remove("active");
 			    if (slideshowPlayTimer !== null) {
 			        clearInterval(slideshowPlayTimer);
 			        slideshowPlayTimer = null;
