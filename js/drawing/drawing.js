@@ -27,6 +27,22 @@ const MAX_HANDS = 2;
 // position before storing it, so a single shared instance is safe).
 const _drawPos = new THREE.Vector3();
 
+// The drawing view renders at 4:3 to match the main p5 canvas (640x480),
+// centered and letterboxed within the fullscreen container.
+const DRAW_ASPECT = 640 / 480;
+
+// Largest 4:3 box that fits the window ("contain"), plus its centering offset.
+function getDrawSize() {
+    const w = Math.min(window.innerWidth, window.innerHeight * DRAW_ASPECT);
+    const h = w / DRAW_ASPECT;
+    return {
+        w: w,
+        h: h,
+        offsetX: (window.innerWidth - w) / 2,
+        offsetY: (window.innerHeight - h) / 2
+    };
+}
+
 // Palette state per controller
 const PALETTE_HOLD_DURATION = 1600; // 1.6 seconds to reveal palette
 const PALETTE_FLICKER_DURATION = 300; // 0.3 seconds
@@ -122,14 +138,15 @@ function initThreeJS() {
     scene.background = new THREE.Color(0x222222);
 
     // Set up camera (position set by updateCameraFromSpherical)
-    camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    camera = new THREE.PerspectiveCamera(75, DRAW_ASPECT, 0.1, 1000);
 
     // Set up renderer
+    const size = getDrawSize();
     renderer = new THREE.WebGLRenderer({ antialias: true });
     // Cap pixel ratio: on HiDPI displays the default (2+) doubles fill-rate
     // cost for little visible gain at this scene complexity.
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
-    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setSize(size.w, size.h);
     // Don't append here - startDrawingMode will handle it
 
     // Add some lighting
@@ -301,9 +318,10 @@ function initThreeJS() {
 }
 
 function onWindowResize() {
-    camera.aspect = window.innerWidth / window.innerHeight;
+    const size = getDrawSize();
+    camera.aspect = DRAW_ASPECT;
     camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setSize(size.w, size.h);
 }
 
 // Keyboard handlers
@@ -535,12 +553,14 @@ function animateLoop() {
             label.main.innerText = `${handLabel}: ${gestureName}`;
             label.sub.innerText = `3D World: ${worldPos.x.toFixed(2)}, ${worldPos.y.toFixed(2)}, ${worldPos.z.toFixed(2)}`;
 
-            // Position label on screen by converting 3D position back to 2D
+            // Position label on screen by converting 3D position back to 2D.
+            // Map NDC onto the centered 4:3 canvas (offset by the letterbox bars).
             const screenPos = controller.position.clone();
             screenPos.project(camera);
 
-            const x = (screenPos.x * .5 + .5) * window.innerWidth;
-            const y = (screenPos.y * -.5 + .5) * window.innerHeight;
+            const drawSize = getDrawSize();
+            const x = drawSize.offsetX + (screenPos.x * .5 + .5) * drawSize.w;
+            const y = drawSize.offsetY + (screenPos.y * -.5 + .5) * drawSize.h;
 
             label.container.style.left = `${x}px`;
             label.container.style.top = `${y - 40}px`; // Offset above the sphere
@@ -1061,10 +1081,11 @@ export async function startDrawingMode(container) {
     // Always move renderer to the container (handles both first run and re-entry)
     container.appendChild(renderer.domElement);
 
-    // Ensure renderer is sized correctly for fullscreen
-    renderer.setSize(window.innerWidth, window.innerHeight);
+    // Ensure renderer is sized correctly (4:3, centered within the container)
+    const size = getDrawSize();
+    renderer.setSize(size.w, size.h);
     if (camera) {
-        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.aspect = DRAW_ASPECT;
         camera.updateProjectionMatrix();
     }
 
