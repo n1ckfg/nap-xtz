@@ -23,6 +23,10 @@ let frame;
 
 const MAX_HANDS = 2;
 
+// Reused scratch vector for per-frame draw-position reads (Frame clones the
+// position before storing it, so a single shared instance is safe).
+const _drawPos = new THREE.Vector3();
+
 // Palette state per controller
 const PALETTE_HOLD_DURATION = 1600; // 1.6 seconds to reveal palette
 const PALETTE_FLICKER_DURATION = 300; // 0.3 seconds
@@ -122,6 +126,9 @@ function initThreeJS() {
 
     // Set up renderer
     renderer = new THREE.WebGLRenderer({ antialias: true });
+    // Cap pixel ratio: on HiDPI displays the default (2+) doubles fill-rate
+    // cost for little visible gain at this scene complexity.
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
     renderer.setSize(window.innerWidth, window.innerHeight);
     // Don't append here - startDrawingMode will handle it
 
@@ -557,13 +564,13 @@ function animateLoop() {
 
         // Start new stroke on trigger_Down
         if (controller.trigger_Down) {
-            const pos = new THREE.Vector3();
+            const pos = _drawPos;
             controller.getDrawPosition(pos);
             frame.beginStroke(pos, i, controllerDrawColor[i]);
         }
         // Continue stroke while trigger_Held
         else if (controller.trigger_Held && frame.hasActiveStroke(i)) {
-            const pos = new THREE.Vector3();
+            const pos = _drawPos;
             controller.getDrawPosition(pos);
             frame.continueStroke(pos, i);
         }
@@ -622,11 +629,11 @@ function animateLoop() {
         // Drawing with mouse (only when palette not active)
         if (!mousePaletteVisible) {
             if (mouseController.trigger_Down) {
-                const pos = new THREE.Vector3();
+                const pos = _drawPos;
                 mouseController.getDrawPosition(pos);
                 frame.beginStroke(pos, MOUSE_CONTROLLER_ID, mouseDrawColor);
             } else if (mouseController.trigger_Held && frame.hasActiveStroke(MOUSE_CONTROLLER_ID)) {
-                const pos = new THREE.Vector3();
+                const pos = _drawPos;
                 mouseController.getDrawPosition(pos);
                 frame.continueStroke(pos, MOUSE_CONTROLLER_ID);
             } else if (mouseController.trigger_Up) {
@@ -696,7 +703,7 @@ function animateLoop() {
                     paletteLine.visible = true;
 
                     // Spawn at controller's current position
-                    const pos = new THREE.Vector3();
+                    const pos = _drawPos;
                     controller.getWorldPosition(pos);
                     paletteSpawnPos[i].copy(pos);
                     palette.position.copy(pos);

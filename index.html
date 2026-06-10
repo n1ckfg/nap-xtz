@@ -72,6 +72,11 @@
 				c = createCanvas(sW * scaleFactor, sH * scaleFactor);
 				c.id("main-canvas");
 
+				// Render at 1x device pixels. On HiDPI/Retina the default density
+				// (2+) would draw this large canvas at 4x the pixels for little
+				// visible gain on the retro vector art. (grid/js/main.js does the same.)
+				pixelDensity(1);
+
 			    //if (!isMobile) setupGif();
 
 				dropZone = document.getElementsByTagName("body")[0];
@@ -97,11 +102,13 @@
 			    */
 				document.getElementById("latest").addEventListener("click", function() {
                     telidon = [];
+				    loop(); // redraw now; loadLatestToken() re-loops when content arrives
 			        loadLatestToken();
 			    });
 				
 				document.getElementById("clear").addEventListener("click", function() {
                     telidon = [];
+				    loop(); // redraw once to show the placeholder, then idle
 			    });
 
 			    document.getElementById("one").addEventListener("click", function() {
@@ -150,6 +157,7 @@
 			        textAlign(CENTER);
 			        text("\\\\ DRAG ' n ' DROP //", width/2, height/2);
 			        textAlign(LEFT);
+			        noLoop(); // idle placeholder is static; stop redrawing
 			        return;
 			    }
 
@@ -158,10 +166,16 @@
 			    scale(scaleFactor);
 			    translate(0,sH-sW);
 
+			    let allFinished = true;
 			    for (let i=0; i<telidon.length; i++) {
 					telidon[i].draw();
+					if (!telidon[i].finished) allFinished = false;
 				}
 			    pop();
+
+			    // Once every drawing has fully revealed, the frame is static —
+			    // stop the loop until new content arrives (see loop() calls below).
+			    if (allFinished) noLoop();
 
 			    /*
 			    if (!isMobile && recording && frameCount % 2 == 0) {
@@ -178,6 +192,7 @@
 			function windowResized() {
 			    scaleFactor = Math.min(windowWidth / sW, windowHeight / sH);
 			    resizeCanvas(sW * scaleFactor, sH * scaleFactor);
+			    loop(); // redraw at the new size (re-idles once finished)
 			}
 
 			// Show the copy icon when dragging over.  Seems to only work for chrome.
@@ -219,6 +234,7 @@
 	            telidon.push(new TelidonDraw([input], sW, sW));
 	            recording = true;
 				setSize(input.length);
+				loop(); // new content to animate — restart the draw loop
 			}
 			window.loadTelidonFromText = loadTelidonFromText;
 
@@ -236,6 +252,7 @@
 			            telidon.push(new TelidonDraw([e2.target.result], sW, sW));
 			            recording = true;
 						setSize(e2.target.result.length);
+						loop(); // new content to animate — restart the draw loop
 			        }
 			        reader.readAsText(new Blob(response), 'UTF-8');
 			    });
@@ -578,6 +595,7 @@
 				stopDrawingMode();
 				const container = document.getElementById('drawing-container');
 				container.classList.remove('active');
+				loop(); // refresh the main canvas (handles exit with no strokes drawn)
 			});
 		</script>
 	</body>
