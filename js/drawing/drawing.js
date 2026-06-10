@@ -1211,10 +1211,13 @@ function convertToNAPLPS() {
             // NDC: x=-1 is left, x=1 is right; y=-1 is bottom, y=1 is top
             // NAPLPS: x=0 is left, x=1 is right; y=0 is top, y=1 is bottom
             const nx = (projected.x + 1) / 2;
-            let ny = (1 - projected.y) / 2; // Flip Y axis
 
-            // OFFSET: Shift 15% toward bottom of screen (y=1 is bottom in NAPLPS)
-            ny = ny + 0.15;
+            // The main canvas renders NAPLPS into a SQUARE 640x640 space, so the
+            // 4:3 view's vertical extent must be compressed by 480/640 (= 1/DRAW_ASPECT)
+            // and pushed down by the remainder, matching the SVG-import convention
+            // (y/sH*0.75 + 0.25). Without this the drawing looks horizontally squeezed.
+            const vScale = 1 / DRAW_ASPECT; // 0.75
+            let ny = ((1 - projected.y) / 2) * vScale + (1 - vScale); // Flip Y, fit 4:3
 
             // Clamp to valid range
             const clampedX = Math.max(0, Math.min(1, nx));
