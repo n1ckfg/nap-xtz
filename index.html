@@ -43,6 +43,8 @@
 			let telidon = [];
 			let maxLength = 3;
 
+			let scaleFactor = 1;
+
 			let dropZone;
 			let sW = 640;
 			let sH = 480;
@@ -64,8 +66,11 @@
 			}
 
 			function setup() {
-				c = createCanvas(sW, sH);
-				c.position(0, 29);
+				// Scale the canvas to fill the window while preserving the
+				// 640x480 aspect ratio (see grid/js/main.js for reference).
+				scaleFactor = Math.min(windowWidth / sW, windowHeight / sH);
+				c = createCanvas(sW * scaleFactor, sH * scaleFactor);
+				c.id("main-canvas");
 
 			    //if (!isMobile) setupGif();
 
@@ -138,7 +143,7 @@
 			    initTezos();
 			}
 
-			function draw() {    
+			function draw() {
 				background(0);
 			    if (telidon.length < 1) {
 			        fill(255);
@@ -148,11 +153,15 @@
 			        return;
 			    }
 
+			    // Draw the (640-unit) artwork scaled to fill the canvas.
+			    push();
+			    scale(scaleFactor);
 			    translate(0,sH-sW);
-				
+
 			    for (let i=0; i<telidon.length; i++) {
 					telidon[i].draw();
 				}
+			    pop();
 
 			    /*
 			    if (!isMobile && recording && frameCount % 2 == 0) {
@@ -164,6 +173,11 @@
 			        gif.render();
 			    }
 			    */
+			}
+
+			function windowResized() {
+			    scaleFactor = Math.min(windowWidth / sW, windowHeight / sH);
+			    resizeCanvas(sW * scaleFactor, sH * scaleFactor);
 			}
 
 			// Show the copy icon when dragging over.  Seems to only work for chrome.
