@@ -461,9 +461,7 @@ export class Frame extends THREE.Group {
             const pointToAdd = rawPoints[addIndex];
             activeStroke.addPoint(pointToAdd);
             tempPoints.push(pointToAdd);
-            // Only rebuild this controller's in-progress temp mesh. Completed
-            // strokes already have persistent meshes and never change.
-            this._updateTempFill(controllerId, tempPoints);
+            this._refreshGeometry();
         }
     }
 
@@ -484,9 +482,6 @@ export class Frame extends THREE.Group {
             this._strokeCounter++;
 
             this.strokes.push(activeStroke);
-            // Build this stroke's mesh once; it never changes again. Keeps
-            // _fillMeshes parallel (index-for-index) with this.strokes.
-            this._addCompletedStrokeMesh(activeStroke);
         }
 
         this._activeStrokes.delete(controllerId);
@@ -498,40 +493,56 @@ export class Frame extends THREE.Group {
         if (tempFill) {
             this.remove(tempFill);
             tempFill.geometry.dispose();
-            tempFill.material.dispose();
             this._tempFillMeshes.delete(controllerId);
         }
+
+        // Final refresh with completed stroke
+        this._refreshGeometry();
     }
 
     /**
-     * Builds and adds a persistent brush mesh for a finalized stroke.
-     * Called once per completed stroke (never per-frame).
+     * Rebuilds the geometry from all strokes plus active temp points from all controllers
      * @private
      */
-    _addCompletedStrokeMesh(stroke) {
-        const brushGeo = stroke.toBrushGeometry();
-        if (!brushGeo) return;
-
-        const brushMat = new THREE.MeshBasicMaterial({
-            color: stroke.color,
-            side: THREE.DoubleSide
-        });
-        const brushMesh = new THREE.Mesh(brushGeo, brushMat);
-        brushMesh.frustumCulled = false;
-        this.add(brushMesh);
-        this._fillMeshes.push(brushMesh);
-    }
-
-    /**
-     * Removes and disposes the most recently completed stroke's mesh.
-     * @private
-     */
-    _removeLastStrokeMesh() {
-        const mesh = this._fillMeshes.pop();
-        if (mesh) {
+    _refreshGeometry() {
+        // Remove old fill meshes
+        for (const mesh of this._fillMeshes) {
             this.remove(mesh);
             mesh.geometry.dispose();
             mesh.material.dispose();
+        }
+        this._fillMeshes = [];
+
+        // Add all completed strokes as brush geometry
+        for (const stroke of this.strokes) {
+            // Create brush mesh for completed stroke
+            const brushGeo = stroke.toBrushGeometry();
+            if (brushGeo) {
+                const brushMat = new THREE.MeshBasicMaterial({
+                    color: stroke.color,
+                    side: THREE.DoubleSide
+                });
+                const brushMesh = new THREE.Mesh(brushGeo, brushMat);
+                brushMesh.frustumCulled = false;
+                this.add(brushMesh);
+                this._fillMeshes.push(brushMesh);
+            }
+        }
+
+        // Add temp brush geometry from all active strokes
+        for (const [controllerId, tempPoints] of this._tempPoints.entries()) {
+            // Update temp brush mesh for this controller
+            this._updateTempFill(controllerId, tempPoints);
+        }
+
+        // Remove temp fills for controllers no longer drawing
+        for (const [controllerId, mesh] of this._tempFillMeshes.entries()) {
+            if (!this._tempPoints.has(controllerId)) {
+                this.remove(mesh);
+                mesh.geometry.dispose();
+                mesh.material.dispose();
+                this._tempFillMeshes.delete(controllerId);
+            }
         }
     }
 
@@ -583,7 +594,7 @@ export class Frame extends THREE.Group {
             return false;
         }
         this.strokes.pop();
-        this._removeLastStrokeMesh();
+        this._refreshGeometry();
         return true;
     }
 
@@ -609,7 +620,7 @@ export class Frame extends THREE.Group {
 
         // Remove the stroke from main geometry immediately (temp mesh shows it)
         this.strokes.pop();
-        this._removeLastStrokeMesh();
+        this._refreshGeometry();
 
         // Flicker the temp mesh
         const startTime = performance.now();
@@ -643,14 +654,12 @@ export class Frame extends THREE.Group {
         for (const mesh of this._fillMeshes) {
             this.remove(mesh);
             mesh.geometry.dispose();
-            mesh.material.dispose();
         }
         this._fillMeshes = [];
 
         for (const mesh of this._tempFillMeshes.values()) {
             this.remove(mesh);
             mesh.geometry.dispose();
-            mesh.material.dispose();
         }
         this._tempFillMeshes.clear();
 
