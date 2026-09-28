@@ -145,6 +145,15 @@
 			}
 
 			function draw() {
+			    // Drawing mode's overlay covers this canvas, so there is nothing
+			    // to draw it for -- but a token that arrives from the chain while
+			    // it is up would run its reveal behind the overlay, taking frame
+			    // rate from drawing mode and CPU from the hand tracker. Leaving
+			    // drawing mode calls loop() again.
+			    if (liveDrawingActive) {
+			        noLoop();
+			        return;
+			    }
 				background(0);
 			    if (telidon.length < 1) {
 			        fill(255);
@@ -613,13 +622,18 @@
 				await startDrawingMode(container);
 			});
 
-			document.getElementById('btn-exit-drawing').addEventListener('click', () => {
+			// The Exit button and the double thumbs-up both leave this way, so
+			// the main canvas's draw loop always starts again behind them.
+			function exitDrawingMode() {
 				stopDrawingMode();
 				const container = document.getElementById('drawing-container');
 				container.classList.remove('active');
 				liveDrawingActive = false;
 				loop(); // refresh the main canvas (handles exit with no strokes drawn)
-			});
+			}
+			window.exitDrawingMode = exitDrawingMode;
+
+			document.getElementById('btn-exit-drawing').addEventListener('click', exitDrawingMode);
 		</script>
 	</body>
 

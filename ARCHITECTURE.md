@@ -24,9 +24,12 @@
 - Contract address: `KT1DypSEV87pwiw6swdYqhDKWRBZ7xfqeS3c`
 
 **js/drawing/** - 3D hand-tracking drawing mode (ES modules, Three.js):
-- `drawing.js` - Main entry, MediaPipe gesture recognition, camera controls
+- `drawing.js` - Main entry, takes the hand tracker's results, camera controls, render loop
+- `hands.js` - `HandTracker` runs the gesture recognizer off the main thread and queues its results; `HandInput` decides which hand in each result is which
+- `hands-worker.js` - One MediaPipe `GestureRecognizer` in a module worker; `HandTracker` runs two
 - `tools.js` - Stroke and Frame classes for managing drawn lines
-- `controller.js` - Hand controller wrapper with Kalman filtering
+- `controller.js` - A hand as a set of buttons and a position, driven by recognizer results: One Euro filtering of the fingertip, debounced signs, and the times strokes start and end
+- `mouse.js` - Mouse controller that projects mouse input into 3D space
 - `palette.js` - Color selection wheel
 - `worldscale.js` - Two-handed scale/rotate gestures
 
@@ -39,7 +42,21 @@
 
 ### Drawing Mode Integration
 
-Drawing mode exports `startDrawingMode(container)` and `stopDrawingMode()` for launching from index.html. The module uses `window._drawingContainer` to reference DOM elements within the active container.
+Drawing mode exports `startDrawingMode(container)` and `stopDrawingMode()` for launching from index.html. The module uses `window._drawingContainer` to reference DOM elements within the active container. Leaving goes through `exitDrawingMode()` in index.html (also `window.exitDrawingMode`), whether by the Exit button or the double thumbs-up, so the p5 canvas's draw loop — stopped while the overlay covers it — always starts again.
+
+### Hands, off the main thread
+
+The recognizer is the most expensive thing drawing mode does, and it used to run synchronously in the render loop, which held drawing mode to the recognizer's rate — two or three frames a second on a slow machine. It now runs in workers (`hands-worker.js`), fed one camera frame at a time as an `ImageBitmap`, and the page renders at its own pace, taking results as they arrive. There are two recognizers, one looking for up to two hands and one for a single hand, which skips the palm detection the two-hand one runs on every frame and so samples a single drawing hand about twice as often. `HandTracker` gives the single-hand one the frames while one hand is in view, and the two-hand one the frames when there is no hand, two hands, or a hand making a sign with a two-handed meaning (a fist, a thumb or a V), with a look for a second hand once a second — but not mid-stroke. Both use MediaPipe's CPU delegate (its "GPU" delegate is WebGL, and shares the GPU with the scene), are warmed up on a blank frame, and are loaded once per page. Where a module worker can't be had, the recognizer runs on the main thread as before.
+
+Every result carries the time its camera frame was taken, and everything downstream runs on that clock rather than on animation frames. `HandInput` matches each result's hands to controllers by where each controller's hand was last seen, merges the recognizer's occasional duplicate of one hand, and declares a hand gone after two results running without it. Each `Controller` smooths the fingertip with One Euro filters and debounces the recognizer's labels into signs. A stroke starts where its sign was first seen and ends where the sign that ended it was first seen; the line tool is sticky through "None" and ends on any other sign or when the hand goes. Points are placed on the camera ray through the fingertip, so a stroke lands on screen under the finger whatever the (noisy) depth. Held gestures are timed on what the camera saw, and a one-handed hold that fills while another hand is making the same sign, not yet confirmed, waits for it (up to 1.5 s): that is an exit or a clear in the making, not a recentre or an undo.
+
+### Strokes
+
+Completed strokes all live in one vertex-coloured mesh (`StrokeBatch` in `tools.js`): a stroke is appended once, when it ends, and undo pops it, so the whole drawing is one draw call. The strokes being drawn keep a mesh each, rebuilt at most once a frame (`Frame.flush()`). `Stroke.refine()` fits a centripetal Catmull-Rom spline through a finished stroke's samples, so sparse samples still draw round curves, and the brush's taper runs by distance along the stroke rather than by point count. `Stroke.toBrushOutline()`, which `convertToNAPLPS()` encodes, is built from the same edges as the mesh.
+
+### Render scale
+
+The renderer draws without MSAA at one device pixel per CSS pixel. When frames run long the render scale drops a step (to 0.5 at most) and the browser scales the canvas up; the step is kept only if frames actually got faster, and the scale climbs back when there is room. A machine that keeps up stays at 1.
 
 ---
 
