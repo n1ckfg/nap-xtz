@@ -13,12 +13,12 @@
 
 ### JavaScript Modules
 
-**js/telidon/**
+**js/libraries/telidon/**
 - `naplps.js` - NAPLPS format encoder/decoder (no p5.js dependency)
 - `TelidonP5.js` - p5.js renderer for decoded NAPLPS data
 - `build/` - Split build files for modular loading
 
-**js/tezos/tezos.js** - Tezos blockchain integration:
+**js/libraries/tezos/tezos.js** - Tezos blockchain integration:
 - Beacon SDK wallet connection
 - FA2 NFT minting to Shadownet
 - Contract address: `KT1DypSEV87pwiw6swdYqhDKWRBZ7xfqeS3c`
