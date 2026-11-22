@@ -54,12 +54,14 @@ function preload() {
     simulationShader = loadShader('shaders/passthrough.vert', 'shaders/simulation.frag');
     renderShader = loadShader('shaders/passthrough.vert', 'shaders/render.frag');
 
-    // Load default NAPLPS file
-    loadStrings(defaultNaplpsFile, function(response) {
-        let napRaw = response.join('\n');
-        naplpsReader = new NaplpsReader(napRaw);
-        console.log("NAPLPS loaded:", naplpsReader.allPoints.length, "points");
-    });
+    // Load default NAPLPS file as raw bytes
+    fetch(defaultNaplpsFile)
+        .then(response => response.arrayBuffer())
+        .then(buffer => {
+            naplpsReader = new NaplpsReader(new Uint8Array(buffer));
+            console.log("NAPLPS loaded:", naplpsReader.allPoints.length, "points");
+        })
+        .catch(err => console.error("Couldn't load " + defaultNaplpsFile, err));
 }
 
 function setup() {
@@ -227,9 +229,9 @@ function setupDragDrop() {
         if (file) {
             let reader = new FileReader();
             reader.onload = function(e2) {
-                loadNaplpsFromText(e2.target.result);
+                loadNaplpsFromText(new Uint8Array(e2.target.result));
             };
-            reader.readAsText(file, 'UTF-8');
+            reader.readAsArrayBuffer(file);
         }
     });
 }

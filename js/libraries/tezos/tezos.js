@@ -12,11 +12,17 @@ let _beaconClient  = null;
 let _activeAccount = null;
 
 // ─── Byte helpers ─────────────────────────────────────────────────────────────
-// Encode a NAPLPS binary string to lowercase hex for on-chain storage.
-function stringToHex(str) {
+// Encode NAPLPS bytes (Uint8Array or binary string) to lowercase hex for on-chain storage.
+function stringToHex(data) {
     let hex = "";
-    for (let i = 0; i < str.length; i++) {
-        hex += str.charCodeAt(i).toString(16).padStart(2, "0");
+    if (data instanceof Uint8Array || Array.isArray(data)) {
+        for (let i = 0; i < data.length; i++) {
+            hex += (data[i] & 0xFF).toString(16).padStart(2, "0");
+        }
+    } else {
+        for (let i = 0; i < data.length; i++) {
+            hex += (data.charCodeAt(i) & 0xFF).toString(16).padStart(2, "0");
+        }
     }
     return hex;
 }

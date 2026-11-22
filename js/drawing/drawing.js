@@ -1343,13 +1343,14 @@ function convertToNAPLPS() {
         return;
     }
 
-    // NapInputWrapper, NapEncoder, Vector2, Vector3 are global (from naplps.js)
-    if (typeof window.NapInputWrapper === 'undefined' || typeof window.NapEncoder === 'undefined') {
-        console.error('NapInputWrapper or NapEncoder not available');
+    // NAPLPS is global (from naplps.js)
+    if (typeof window.NAPLPS === 'undefined' || typeof window.NAPLPS.encode !== 'function') {
+        console.error('NAPLPS.encode not available');
         return;
     }
 
-    const input = [];
+    const commands = [{ type: 'reset', screen: true, r: 0, g: 0, b: 0 }];
+    let strokeCount = 0;
 
     for (const stroke of frame.strokes) {
         if (!stroke.points || stroke.points.length < 2) continue;
@@ -1358,36 +1359,28 @@ function convertToNAPLPS() {
         const outline3D = stroke.toBrushOutline();
         if (outline3D.length < 3) continue;
 
-        // Convert hex color to RGB Vector3 (0-255)
+        // Convert hex color to normalized RGB (0-1)
         const hex = stroke.color || 0xffffff;
-        const r = (hex >> 16) & 0xff;
-        const g = (hex >> 8) & 0xff;
-        const b = hex & 0xff;
-        const color = new window.Vector3(r, g, b);
+        const r = ((hex >> 16) & 0xff) / 255;
+        const g = ((hex >> 8) & 0xff) / 255;
+        const b = (hex & 0xff) / 255;
 
-        // Project 3D outline points to 2D normalized coordinates
+        // Project 3D outline points to NAPLPS unit-screen coordinates
+        // NDC: x=-1 is left, x=1 is right; y=-1 is bottom, y=1 is top
+        // NAPLPS: x=0..1 left-to-right, y=0..0.75 bottom-to-top (4:3 aspect)
+        const vScale = 1 / DRAW_ASPECT; // 0.75
         let points2D = [];
         for (const pt of outline3D) {
-            // Clone point and project to NDC (-1 to 1)
             const projected = pt.clone().project(camera);
 
-            // Convert NDC to normalized 0-1 coordinates
-            // NDC: x=-1 is left, x=1 is right; y=-1 is bottom, y=1 is top
-            // NAPLPS: x=0 is left, x=1 is right; y=0 is top, y=1 is bottom
             const nx = (projected.x + 1) / 2;
+            const ny = ((projected.y + 1) / 2) * vScale;
 
-            // The main canvas renders NAPLPS into a SQUARE 640x640 space, so the
-            // 4:3 view's vertical extent must be compressed by 480/640 (= 1/DRAW_ASPECT)
-            // and pushed down by the remainder, matching the SVG-import convention
-            // (y/sH*0.75 + 0.25). Without this the drawing looks horizontally squeezed.
-            const vScale = 1 / DRAW_ASPECT; // 0.75
-            let ny = ((1 - projected.y) / 2) * vScale + (1 - vScale); // Flip Y, fit 4:3
+            // Coordinate operands span [-1, 1), so 1.0 itself has no encoding.
+            const clampedX = Math.max(0, Math.min(0.999, nx));
+            const clampedY = Math.max(0, Math.min(0.999, ny));
 
-            // Clamp to valid range
-            const clampedX = Math.max(0, Math.min(1, nx));
-            const clampedY = Math.max(0, Math.min(1, ny));
-
-            points2D.push(new window.Vector2(clampedX, clampedY));
+            points2D.push({ x: clampedX, y: clampedY });
         }
 
         // Simplify points using RDP algorithm
@@ -1395,26 +1388,28 @@ function convertToNAPLPS() {
             points2D = window.rdpSimplify(points2D, 0.002);
         }
 
-        // Create NapInputWrapper as filled polygon
-        const napStroke = new window.NapInputWrapper(color, points2D, true);
-        input.push(napStroke);
+        if (points2D.length < 2) continue;
+
+        commands.push({ type: 'setColor', r, g, b });
+        commands.push({ type: 'polygon', points: points2D, filled: true });
+        strokeCount++;
     }
 
-    if (input.length === 0) {
+    if (strokeCount === 0) {
         console.log('No valid strokes to encode');
         return;
     }
 
     // Encode to NAPLPS
-    const encoder = new window.NapEncoder(input);
+    const napRaw = window.NAPLPS.encode(commands);
 
     // Load into the main canvas
     if (typeof window.loadTelidonFromText === 'function') {
-        window.loadTelidonFromText(encoder.napRaw);
+        window.loadTelidonFromText(napRaw);
     } else {
         console.error('loadTelidonFromText not available');
     }
 
-    console.log(`Converted ${input.length} strokes to NAPLPS`);
+    console.log(`Converted ${strokeCount} strokes to NAPLPS`);
 }
 
